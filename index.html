@@ -159,9 +159,28 @@
       </div>
 
       <div class="preview__actions">
+        <div class="export-options">
+          <label class="field">
+            <span>書き出し形式</span>
+            <select id="exportFormat">
+              <option value="png" selected>PNG画像（高画質）</option>
+              <option value="svg">SVG（ベクター・文字埋め込み）</option>
+              <option value="pdf">PDF</option>
+            </select>
+          </label>
+          <label class="field" id="scaleField">
+            <span>解像度倍率</span>
+            <select id="exportScale">
+              <option value="2">2倍</option>
+              <option value="3" selected>3倍（推奨）</option>
+              <option value="4">4倍（大きめ）</option>
+            </select>
+          </label>
+        </div>
+
         <button id="downloadBtn" class="stamp-btn" type="button">
           <span class="stamp-btn__ring"></span>
-          <span class="stamp-btn__label">画像を<br>生成</span>
+          <span class="stamp-btn__label">書き<br>出し</span>
         </button>
         <p class="preview__note" id="statusNote">フォントの読み込みが完了すると、正確なプレビューが表示されます。</p>
       </div>
@@ -171,12 +190,13 @@
   </div>
 
   <footer class="app-footer">
-    <p>フォント：BIZ UDGothic / BIZ UDMincho（Google Fonts）　-　入力内容はブラウザ内でのみ処理され、サーバーには送信されません。</p>
+    <p>フォント：BIZ UDGothic / BIZ UDMincho（Google Fonts）　-　書き出し：html-to-image / jsPDF　-　入力内容はブラウザ内でのみ処理され、サーバーには送信されません。</p>
   </footer>
 
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

@@ -21,6 +21,9 @@
 
     downloadBtn: document.getElementById("downloadBtn"),
     statusNote: document.getElementById("statusNote"),
+    exportFormat: document.getElementById("exportFormat"),
+    exportScale: document.getElementById("exportScale"),
+    scaleField: document.getElementById("scaleField"),
   };
 
   const choiceRows = Array.from(document.querySelectorAll(".choice-row"));
@@ -142,40 +145,98 @@
     setStatus("画像を生成できます。", "is-ready");
   }
 
+  el.exportFormat.addEventListener("change", () => {
+    el.scaleField.style.display = el.exportFormat.value === "svg" ? "none" : "";
+  });
+
   // ---------- export ----------
+  function triggerDownload(href, filename) {
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function timestamp() {
+    return new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
+  }
+
+  async function exportPng(pixelRatio) {
+    const dataUrl = await htmlToImage.toPng(el.paper, {
+      backgroundColor: "#ffffff",
+      pixelRatio,
+      cacheBust: true,
+    });
+    triggerDownload(dataUrl, `mondai_${timestamp()}.png`);
+  }
+
+  async function exportSvg() {
+    const dataUrl = await htmlToImage.toSvg(el.paper, {
+      backgroundColor: "#ffffff",
+      cacheBust: true,
+    });
+    triggerDownload(dataUrl, `mondai_${timestamp()}.svg`);
+  }
+
+  async function exportPdf(pixelRatio) {
+    const rect = el.paper.getBoundingClientRect();
+    const dataUrl = await htmlToImage.toPng(el.paper, {
+      backgroundColor: "#ffffff",
+      pixelRatio,
+      cacheBust: true,
+    });
+
+    // CSS px -> pt (1px = 0.75pt at 96dpi). Page size follows the sheet's
+    // on-screen size; pixelRatio only affects the embedded image's resolution.
+    const widthPt = rect.width * 0.75;
+    const heightPt = rect.height * 0.75;
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+      orientation: widthPt >= heightPt ? "landscape" : "portrait",
+      unit: "pt",
+      format: [widthPt, heightPt],
+    });
+    pdf.addImage(dataUrl, "PNG", 0, 0, widthPt, heightPt, undefined, "FAST");
+    pdf.save(`mondai_${timestamp()}.pdf`);
+  }
+
   async function downloadImage() {
-    if (typeof html2canvas === "undefined") {
+    if (typeof htmlToImage === "undefined") {
       setStatus("画像生成ライブラリの読み込みに失敗しました。ネットワーク接続を確認してください。", "is-error");
       return;
     }
 
     el.downloadBtn.disabled = true;
-    setStatus("画像を生成しています…");
+    const format = el.exportFormat.value;
+    setStatus(
+      format === "svg" ? "SVGを書き出しています…" : "画像を生成しています…"
+    );
 
     try {
       if (document.fonts && document.fonts.ready) {
         await document.fonts.ready;
       }
 
-      const canvas = await html2canvas(el.paper, {
-        backgroundColor: "#ffffff",
-        scale: 2,
-        useCORS: true,
-      });
+      const scale = Number(el.exportScale.value) || 3;
 
-      const dataUrl = canvas.toDataURL("image/png");
-      const link = document.createElement("a");
-      const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
-      link.href = dataUrl;
-      link.download = `mondai_${stamp}.png`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      if (format === "png") {
+        await exportPng(scale);
+      } else if (format === "svg") {
+        await exportSvg();
+      } else if (format === "pdf") {
+        if (typeof window.jspdf === "undefined") {
+          throw new Error("jsPDF not loaded");
+        }
+        await exportPdf(scale);
+      }
 
-      setStatus("画像をダウンロードしました。", "is-ready");
+      setStatus("書き出しが完了しました。", "is-ready");
     } catch (err) {
       console.error(err);
-      setStatus("画像の生成に失敗しました。時間をおいて再度お試しください。", "is-error");
+      setStatus("書き出しに失敗しました。時間をおいて再度お試しください。", "is-error");
     } finally {
       el.downloadBtn.disabled = false;
     }
