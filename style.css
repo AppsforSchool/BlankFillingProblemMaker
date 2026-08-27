@@ -292,7 +292,7 @@ input[type="range"]{
   border: 1.4px solid var(--ink);
   padding: 16px 20px;
   margin: 0 0 20px;
-  background: #fffefb;
+  background: #ffffff;
 }
 .resource-box__title{
   font-size: calc(var(--doc-font-size, 16px) - 2px);
@@ -313,10 +313,10 @@ input[type="range"]{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 3em;
-  padding: 0 .9em;
+  min-width: 4em;
+  padding: 0 1.1em;
   margin: 0 .15em;
-  border: 1.2px solid var(--ink);
+  border: 2px solid var(--ink);
   font-family: var(--font-gothic);
   font-weight: 700;
   line-height: 1.5;
