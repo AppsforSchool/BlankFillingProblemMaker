@@ -163,29 +163,32 @@
     return new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
   }
 
-  async function exportPng(pixelRatio) {
+  async function exportPng(pixelRatio, fontEmbedCss) {
     const dataUrl = await htmlToImage.toPng(el.paper, {
       backgroundColor: "#ffffff",
       pixelRatio,
       cacheBust: true,
+      fontEmbedCss,
     });
     triggerDownload(dataUrl, `mondai_${timestamp()}.png`);
   }
 
-  async function exportSvg() {
+  async function exportSvg(fontEmbedCss) {
     const dataUrl = await htmlToImage.toSvg(el.paper, {
       backgroundColor: "#ffffff",
       cacheBust: true,
+      fontEmbedCss,
     });
     triggerDownload(dataUrl, `mondai_${timestamp()}.svg`);
   }
 
-  async function exportPdf(pixelRatio) {
+  async function exportPdf(pixelRatio, fontEmbedCss) {
     const rect = el.paper.getBoundingClientRect();
     const dataUrl = await htmlToImage.toPng(el.paper, {
       backgroundColor: "#ffffff",
       pixelRatio,
       cacheBust: true,
+      fontEmbedCss,
     });
 
     // CSS px -> pt (1px = 0.75pt at 96dpi). Page size follows the sheet's
@@ -203,6 +206,24 @@
     pdf.save(`mondai_${timestamp()}.pdf`);
   }
 
+  // Force the browser to actually fetch every weight of both custom
+  // fonts before we ask html-to-image to embed them. Without this,
+  // a weight that has never been used on screen (e.g. a bold variant
+  // only needed for an empty/optional field) may be missing from
+  // document.fonts, and the exporter silently falls back to a
+  // system font for it.
+  async function ensureFontsLoaded() {
+    if (!(document.fonts && document.fonts.load)) return;
+    const specs = [
+      '400 16px "BIZ UDGothic"',
+      '700 16px "BIZ UDGothic"',
+      '400 16px "BIZ UDMincho"',
+      '700 16px "BIZ UDMincho"',
+    ];
+    await Promise.all(specs.map((s) => document.fonts.load(s).catch(() => null)));
+    if (document.fonts.ready) await document.fonts.ready;
+  }
+
   async function downloadImage() {
     if (typeof htmlToImage === "undefined") {
       setStatus("画像生成ライブラリの読み込みに失敗しました。ネットワーク接続を確認してください。", "is-error");
@@ -216,21 +237,25 @@
     );
 
     try {
-      if (document.fonts && document.fonts.ready) {
-        await document.fonts.ready;
-      }
+      await ensureFontsLoaded();
+
+      // Pre-build the embeddable font CSS (base64 font data) once,
+      // from stylesheets that actually apply to the paper element.
+      // This is what lets the exported file keep BIZ UDGothic /
+      // BIZ UDMincho instead of silently substituting a system font.
+      const fontEmbedCss = await htmlToImage.getFontEmbedCSS(el.paper);
 
       const scale = Number(el.exportScale.value) || 3;
 
       if (format === "png") {
-        await exportPng(scale);
+        await exportPng(scale, fontEmbedCss);
       } else if (format === "svg") {
-        await exportSvg();
+        await exportSvg(fontEmbedCss);
       } else if (format === "pdf") {
         if (typeof window.jspdf === "undefined") {
           throw new Error("jsPDF not loaded");
         }
-        await exportPdf(scale);
+        await exportPdf(scale, fontEmbedCss);
       }
 
       setStatus("書き出しが完了しました。", "is-ready");
