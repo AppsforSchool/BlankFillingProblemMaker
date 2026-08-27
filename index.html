@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>空欄補充問題メーカー｜社会科入試風・組み合わせ選択問題ジェネレーター</title>
+<meta name="description" content="岐阜県公立高校入試の社会科のような「文中の2つの空欄に当てはまる語句の正しい組み合わせを選ぶ」問題を、フォームに入力するだけで問題画像として書き出せるツールです。">
+
+<!-- Google Fonts: BIZ UDGothic / BIZ UDMincho -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic:wght@400;700&family=BIZ+UDMincho&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ===== Header ===== -->
+  <header class="app-header">
+    <div class="app-header__mark" aria-hidden="true">検</div>
+    <div class="app-header__text">
+      <h1>空欄補充問題メーカー</h1>
+      <p>文中の2つの空欄に当てはまる語句の「正しい組み合わせ」を選ぶ形式の問題を、入試の解答用紙のような見た目の画像に書き出します。</p>
+    </div>
+  </header>
+
+  <div class="app-body">
+
+    <!-- ===== Editor (left) ===== -->
+    <section class="editor" aria-label="問題を入力する">
+
+      <div class="field-group">
+        <h2><span class="field-group__index">01</span>空欄のラベル</h2>
+        <p class="field-group__hint">本文中で空欄を示す文字です。1文字を推奨します（例：a, b）。</p>
+        <div class="row row--two">
+          <label class="field">
+            <span>空欄①のラベル</span>
+            <input type="text" id="labelA" maxlength="4" value="a">
+          </label>
+          <label class="field">
+            <span>空欄②のラベル</span>
+            <input type="text" id="labelB" maxlength="4" value="b">
+          </label>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <h2><span class="field-group__index">02</span>資料・本文</h2>
+        <p class="field-group__hint">枠で囲んで表示される文章です。空欄の位置に <code>{a}</code> <code>{b}</code> と入力してください（ラベルを変えても中かっこの中身は a / b のままでOKです）。</p>
+        <label class="field">
+          <span>資料タイトル（任意）</span>
+          <input type="text" id="resourceTitle" placeholder="例：［資料１］　※空欄のままなら非表示">
+        </label>
+        <label class="field">
+          <span>本文</span>
+          <textarea id="resourceBody" rows="6">9世紀の末ごろから、「竹取物語」や紀貫之らがまとめた「{a}」など、仮名文字による文学作品が盛んに作られるようになった。また、{b}から出た天皇のきさきたちの周りには教養や才能のある女性が集められ、紫式部の「源氏物語」や清少納言の「枕草子」などが生み出された。</textarea>
+        </label>
+      </div>
+
+      <div class="field-group">
+        <h2><span class="field-group__index">03</span>設問文</h2>
+        <p class="field-group__hint">こちらも空欄の位置に <code>{a}</code> <code>{b}</code> と入力してください。</p>
+        <label class="field">
+          <span>設問文</span>
+          <textarea id="questionText" rows="3">下線②について、次の{a}、{b}に当てはまる言葉の正しい組み合わせを、ア～エから一つ選び、符号で書きなさい。</textarea>
+        </label>
+      </div>
+
+      <div class="field-group">
+        <h2><span class="field-group__index">04</span>選択肢（ア～エ）</h2>
+        <p class="field-group__hint">それぞれの記号について、空欄①・空欄②に入る語句を入力してください。</p>
+
+        <div class="choice-row" data-symbol="ア">
+          <div class="choice-row__symbol">ア</div>
+          <div class="choice-row__inputs">
+            <input type="text" class="choiceA" placeholder="空欄①の語句" value="古今和歌集">
+            <input type="text" class="choiceB" placeholder="空欄②の語句" value="藤原氏">
+          </div>
+        </div>
+        <div class="choice-row" data-symbol="イ">
+          <div class="choice-row__symbol">イ</div>
+          <div class="choice-row__inputs">
+            <input type="text" class="choiceA" placeholder="空欄①の語句" value="古今和歌集">
+            <input type="text" class="choiceB" placeholder="空欄②の語句" value="細川氏">
+          </div>
+        </div>
+        <div class="choice-row" data-symbol="ウ">
+          <div class="choice-row__symbol">ウ</div>
+          <div class="choice-row__inputs">
+            <input type="text" class="choiceA" placeholder="空欄①の語句" value="万葉集">
+            <input type="text" class="choiceB" placeholder="空欄②の語句" value="藤原氏">
+          </div>
+        </div>
+        <div class="choice-row" data-symbol="エ">
+          <div class="choice-row__symbol">エ</div>
+          <div class="choice-row__inputs">
+            <input type="text" class="choiceA" placeholder="空欄①の語句" value="万葉集">
+            <input type="text" class="choiceB" placeholder="空欄②の語句" value="細川氏">
+          </div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <h2><span class="field-group__index">05</span>フォント設定</h2>
+        <div class="row row--two">
+          <label class="field">
+            <span>資料・本文のフォント</span>
+            <select id="fontBody">
+              <option value="mincho" selected>BIZ UDMincho（明朝）</option>
+              <option value="gothic">BIZ UDGothic（ゴシック）</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>設問文・選択肢のフォント</span>
+            <select id="fontUI">
+              <option value="mincho" selected>BIZ UDMincho（明朝）</option>
+              <option value="gothic">BIZ UDGothic（ゴシック）</option>
+            </select>
+          </label>
+        </div>
+        <div class="row row--two">
+          <label class="field">
+            <span>用紙の幅</span>
+            <select id="paperWidth">
+              <option value="820">やや狭い（820px）</option>
+              <option value="900" selected>標準（900px）</option>
+              <option value="980">やや広い（980px）</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>文字サイズ</span>
+            <input type="range" id="fontSize" min="14" max="20" value="16">
+          </label>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ===== Preview (right) ===== -->
+    <section class="preview" aria-label="プレビューと書き出し">
+
+      <div class="preview__stage">
+        <div class="paper" id="capture-area">
+          <div class="paper__content" id="paperContent">
+
+            <p class="q-instruction" id="prevInstruction"></p>
+
+            <div class="resource-box" id="resourceBox">
+              <div class="resource-box__title" id="prevTitle"></div>
+              <p class="resource-box__body" id="prevBody"></p>
+            </div>
+
+            <div class="choices-grid" id="prevChoices"></div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="preview__actions">
+        <button id="downloadBtn" class="stamp-btn" type="button">
+          <span class="stamp-btn__ring"></span>
+          <span class="stamp-btn__label">画像を<br>生成</span>
+        </button>
+        <p class="preview__note" id="statusNote">フォントの読み込みが完了すると、正確なプレビューが表示されます。</p>
+      </div>
+
+    </section>
+
+  </div>
+
+  <footer class="app-footer">
+    <p>フォント：BIZ UDGothic / BIZ UDMincho（Google Fonts）　-　入力内容はブラウザ内でのみ処理され、サーバーには送信されません。</p>
+  </footer>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
