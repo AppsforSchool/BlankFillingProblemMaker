@@ -24,6 +24,9 @@
     prevOrderItems: document.getElementById("prevOrderItems"),
 
     labelSection: document.getElementById("labelSection"),
+    labelRow: document.getElementById("labelRow"),
+    labelBField: document.getElementById("labelBField"),
+    labelASpan: document.getElementById("labelASpan"),
     resourceFields: document.getElementById("resourceFields"),
     choicesSection: document.getElementById("choicesSection"),
     orderSection: document.getElementById("orderSection"),
@@ -43,8 +46,10 @@
   // Safely turn a template containing the literal tokens {a} / {b}
   // (blank boxes) and [u]...[/u] (underline) into a DocumentFragment.
   // Everything else is inserted as plain text (never as HTML), so
-  // user input can never break out into markup.
-  function buildInlineNodes(template, labelA, labelB) {
+  // user input can never break out into markup. When `wide` is true
+  // (記述問題: a single, wider blank for a written answer) the blank
+  // box gets an extra modifier class.
+  function buildInlineNodes(template, labelA, labelB, wide) {
     const frag = document.createDocumentFragment();
     const safeA = labelA && labelA.trim() ? labelA.trim() : "a";
     const safeB = labelB && labelB.trim() ? labelB.trim() : "b";
@@ -65,7 +70,7 @@
       let node;
       if (part === "{a}" || part === "{b}") {
         const span = document.createElement("span");
-        span.className = "blank-box";
+        span.className = wide ? "blank-box blank-box--wide" : "blank-box";
         span.textContent = part === "{a}" ? safeA : safeB;
         node = span;
       } else {
@@ -100,6 +105,12 @@
     el.labelSection.style.display = format === "order" ? "none" : "";
     el.choicesSection.style.display = format === "combo" ? "" : "none";
     el.orderSection.style.display = format === "order" ? "" : "none";
+
+    // 記述問題は空欄が1つだけなので、空欄②の入力欄は隠す。
+    const isDescriptive = format === "descriptive";
+    el.labelBField.style.display = isDescriptive ? "none" : "";
+    el.labelRow.style.gridTemplateColumns = isDescriptive ? "1fr" : "1fr 1fr";
+    el.labelASpan.textContent = isDescriptive ? "空欄のラベル" : "空欄①のラベル";
   }
 
   function updateResourceFieldsVisibility() {
@@ -109,13 +120,14 @@
   // ---------- main render ----------
   function render() {
     const format = el.questionFormat.value;
+    const isDescriptive = format === "descriptive";
     const labelA = el.labelA.value;
     const labelB = el.labelB.value;
 
     // instruction line
     setChildren(
       el.prevInstruction,
-      buildInlineNodes(el.questionText.value, labelA, labelB)
+      buildInlineNodes(el.questionText.value, labelA, labelB, isDescriptive)
     );
     applyFontClass(el.prevInstruction, el.fontUI.value);
 
@@ -126,7 +138,7 @@
       applyFontClass(el.prevTitle, el.fontBody.value);
       setChildren(
         el.prevBody,
-        buildInlineNodes(el.resourceBody.value, labelA, labelB)
+        buildInlineNodes(el.resourceBody.value, labelA, labelB, isDescriptive)
       );
       applyFontClass(el.prevBody, el.fontBody.value);
     } else {
