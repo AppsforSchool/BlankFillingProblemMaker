@@ -259,7 +259,55 @@
       cacheBust: true,
       fontEmbedCss,
     });
-    triggerDownload(dataUrl, `mondai_${timestamp()}.svg`);
+
+    let svgText = dataUrlToText(dataUrl);
+    svgText = sanitizeSvgFontQuotes(svgText);
+
+    const blob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+    const blobUrl = URL.createObjectURL(blob);
+    triggerDownload(blobUrl, `mondai_${timestamp()}.svg`);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+  }
+
+  // html-to-image's toSvg() returns a data: URL. Decode it back to a
+  // plain XML string so we can patch it before saving.
+  function dataUrlToText(dataUrl) {
+    const commaIndex = dataUrl.indexOf(",");
+    const header = dataUrl.slice(0, commaIndex);
+    const body = dataUrl.slice(commaIndex + 1);
+    if (/;base64/i.test(header)) {
+      const binary = atob(body);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new TextDecoder("utf-8").decode(bytes);
+    }
+    return decodeURIComponent(body);
+  }
+
+  // When a computed style is serialized into the SVG's HTML (inside a
+  // foreignObject), multi-word font names like "BIZ UDGothic" get
+  // wrapped in quotes so they parse as a single family name. If that
+  // quoted value then gets embedded inside an attribute delimited by
+  // the same quote character, the result is invalid XML ("AttValue: '
+  // expected" when a strict parser opens the file). Since every family
+  // name we use is known in advance, we simply strip the quotes around
+  // each one wherever they appear — unquoted multi-word family names
+  // are valid CSS, so nothing is lost, and the quote-clash disappears.
+  function sanitizeSvgFontQuotes(svgText) {
+    const familyNames = [
+      "BIZ UDGothic",
+      "BIZ UDMincho",
+      "Hiragino Sans",
+      "Hiragino Mincho ProN",
+      "Yu Gothic",
+      "Yu Mincho",
+    ];
+    let result = svgText;
+    familyNames.forEach((name) => {
+      const pattern = new RegExp(`["']${name}["']`, "g");
+      result = result.replace(pattern, name);
+    });
+    return result;
   }
 
   async function exportPdf(scale) {
