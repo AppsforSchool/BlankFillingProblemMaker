@@ -14,6 +14,7 @@
     fontUI: document.getElementById("fontUI"),
     paperWidth: document.getElementById("paperWidth"),
     fontSize: document.getElementById("fontSize"),
+    paperPadding: document.getElementById("paperPadding"),
 
     paper: document.getElementById("capture-area"),
     prevInstruction: document.getElementById("prevInstruction"),
@@ -202,6 +203,7 @@
     // sizing
     el.paper.style.maxWidth = `${el.paperWidth.value}px`;
     el.paper.style.setProperty("--doc-font-size", `${el.fontSize.value}px`);
+    el.paper.style.setProperty("--paper-padding", `${el.paperPadding.value}px`);
   }
 
   // ---------- underline tool buttons ----------
@@ -231,7 +233,7 @@
   const watchedInputs = [
     el.questionFormat, el.labelA, el.labelB, el.showResource,
     el.resourceTitle, el.resourceBody, el.questionText,
-    el.fontBody, el.fontUI, el.paperWidth, el.fontSize,
+    el.fontBody, el.fontUI, el.paperWidth, el.fontSize, el.paperPadding,
     ...choiceRows.flatMap((r) => [r.querySelector(".choiceA"), r.querySelector(".choiceB")]),
     ...orderRows.map((r) => r.querySelector(".orderItem")),
   ];
