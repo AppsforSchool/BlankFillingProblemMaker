@@ -149,6 +149,70 @@
     el.scaleField.style.display = el.exportFormat.value === "svg" ? "none" : "";
   });
 
+  // ---------- robust Google Fonts embedding ----------
+  // html-to-image's built-in font auto-detection can be unreliable
+  // (it has to guess which @font-face rules apply to the captured
+  // node). Instead, we fetch the exact Google Fonts stylesheet we
+  // already load in <head>, download every referenced font file
+  // ourselves, and rewrite the CSS to use base64 data URIs. This
+  // gives html-to-image a guaranteed-correct, self-contained
+  // stylesheet to embed — no auto-detection involved.
+
+  let cachedFontEmbedCssPromise = null;
+
+  function arrayBufferToBase64(buffer) {
+    let binary = "";
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
+  }
+
+  function guessFontMime(url) {
+    if (url.endsWith(".woff2")) return "font/woff2";
+    if (url.endsWith(".woff")) return "font/woff";
+    if (url.endsWith(".ttf")) return "font/ttf";
+    return "application/octet-stream";
+  }
+
+  async function buildEmbeddedGoogleFontCss() {
+    const link = document.querySelector('link[href*="fonts.googleapis.com"]');
+    if (!link) throw new Error("Google Fonts <link> not found");
+
+    const cssRes = await fetch(link.href, { mode: "cors" });
+    if (!cssRes.ok) throw new Error(`Google Fonts CSS fetch failed: ${cssRes.status}`);
+    let cssText = await cssRes.text();
+
+    const urlRegex = /url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g;
+    const fontUrls = [...new Set([...cssText.matchAll(urlRegex)].map((m) => m[1]))];
+
+    await Promise.all(
+      fontUrls.map(async (fontUrl) => {
+        const fontRes = await fetch(fontUrl, { mode: "cors" });
+        if (!fontRes.ok) throw new Error(`Font file fetch failed: ${fontUrl}`);
+        const buf = await fontRes.arrayBuffer();
+        const dataUri = `data:${guessFontMime(fontUrl)};base64,${arrayBufferToBase64(buf)}`;
+        cssText = cssText.split(fontUrl).join(dataUri);
+      })
+    );
+
+    return cssText;
+  }
+
+  // Computed once and reused for every export in this session.
+  async function getFontEmbedCss() {
+    if (!cachedFontEmbedCssPromise) {
+      cachedFontEmbedCssPromise = buildEmbeddedGoogleFontCss().catch(async (err) => {
+        console.warn("Custom font embedding failed, falling back to html-to-image's auto-detection.", err);
+        cachedFontEmbedCssPromise = null; // allow retry next time
+        return htmlToImage.getFontEmbedCSS(el.paper);
+      });
+    }
+    return cachedFontEmbedCssPromise;
+  }
+
   // ---------- export ----------
   function triggerDownload(href, filename) {
     const link = document.createElement("a");
@@ -240,10 +304,10 @@
       await ensureFontsLoaded();
 
       // Pre-build the embeddable font CSS (base64 font data) once,
-      // from stylesheets that actually apply to the paper element.
-      // This is what lets the exported file keep BIZ UDGothic /
-      // BIZ UDMincho instead of silently substituting a system font.
-      const fontEmbedCss = await htmlToImage.getFontEmbedCSS(el.paper);
+      // from our own robust fetch-and-inline routine. This is what
+      // lets the exported file keep BIZ UDGothic / BIZ UDMincho
+      // instead of silently substituting a system font.
+      const fontEmbedCss = await getFontEmbedCss();
 
       const scale = Number(el.exportScale.value) || 3;
 
