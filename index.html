@@ -177,6 +177,7 @@
             </select>
           </label>
         </div>
+        <p class="export-note" id="svgNote" style="display:none;">※ SVGはブラウザの仕様上、まれにフォントが正しく反映されないことがあります。安定して同じ見た目で書き出したい場合はPNGをおすすめします。</p>
 
         <button id="downloadBtn" class="stamp-btn" type="button">
           <span class="stamp-btn__ring"></span>
@@ -190,11 +191,12 @@
   </div>
 
   <footer class="app-footer">
-    <p>フォント：BIZ UDGothic / BIZ UDMincho（Google Fonts）　-　書き出し：html-to-image / jsPDF　-　入力内容はブラウザ内でのみ処理され、サーバーには送信されません。</p>
+    <p>フォント：BIZ UDGothic / BIZ UDMincho（Google Fonts）　-　書き出し：html2canvas（PNG/PDF）／html-to-image（SVG）／jsPDF　-　入力内容はブラウザ内でのみ処理され、サーバーには送信されません。</p>
   </footer>
 
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="script.js"></script>

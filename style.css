@@ -373,6 +373,15 @@ input[type="range"]{
   font-size: 11.5px;
 }
 
+.export-note{
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  max-width: 340px;
+  text-align: center;
+}
+
 .stamp-btn{
   position: relative;
   width: 92px;

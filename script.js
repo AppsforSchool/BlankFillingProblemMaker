@@ -146,7 +146,9 @@
   }
 
   el.exportFormat.addEventListener("change", () => {
-    el.scaleField.style.display = el.exportFormat.value === "svg" ? "none" : "";
+    const isSvg = el.exportFormat.value === "svg";
+    el.scaleField.style.display = isSvg ? "none" : "";
+    document.getElementById("svgNote").style.display = isSvg ? "" : "none";
   });
 
   // ---------- robust Google Fonts embedding ----------
@@ -184,6 +186,16 @@
     const cssRes = await fetch(link.href, { mode: "cors" });
     if (!cssRes.ok) throw new Error(`Google Fonts CSS fetch failed: ${cssRes.status}`);
     let cssText = await cssRes.text();
+
+    // "font-display: swap" tells the browser it's fine to paint with a
+    // fallback font first and swap in the real font later. That's a
+    // reasonable default for normal page loads, but it's actively harmful
+    // for a one-shot offscreen SVG->canvas snapshot (used by the SVG
+    // export path below): the snapshot can get taken during the fallback
+    // phase, or mid-swap, which is exactly what produced the wrong-font /
+    // overlapping-glyph artifacts. "block" makes the browser wait
+    // (briefly) for the real font instead.
+    cssText = cssText.replace(/font-display:\s*swap\s*;?/gi, "font-display: block;");
 
     const urlRegex = /url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g;
     const fontUrls = [...new Set([...cssText.matchAll(urlRegex)].map((m) => m[1]))];
@@ -227,13 +239,17 @@
     return new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
   }
 
-  async function exportPng(pixelRatio, fontEmbedCss) {
-    const dataUrl = await htmlToImage.toPng(el.paper, {
+  async function renderCanvas(scale) {
+    return html2canvas(el.paper, {
       backgroundColor: "#ffffff",
-      pixelRatio,
-      cacheBust: true,
-      fontEmbedCss,
+      scale,
+      useCORS: true,
     });
+  }
+
+  async function exportPng(scale) {
+    const canvas = await renderCanvas(scale);
+    const dataUrl = canvas.toDataURL("image/png");
     triggerDownload(dataUrl, `mondai_${timestamp()}.png`);
   }
 
@@ -246,17 +262,14 @@
     triggerDownload(dataUrl, `mondai_${timestamp()}.svg`);
   }
 
-  async function exportPdf(pixelRatio, fontEmbedCss) {
-    const rect = el.paper.getBoundingClientRect();
-    const dataUrl = await htmlToImage.toPng(el.paper, {
-      backgroundColor: "#ffffff",
-      pixelRatio,
-      cacheBust: true,
-      fontEmbedCss,
-    });
+  async function exportPdf(scale) {
+    const canvas = await renderCanvas(scale);
+    const dataUrl = canvas.toDataURL("image/png");
 
     // CSS px -> pt (1px = 0.75pt at 96dpi). Page size follows the sheet's
-    // on-screen size; pixelRatio only affects the embedded image's resolution.
+    // on-screen size; the render scale only affects the embedded image's
+    // resolution, not the physical page size.
+    const rect = el.paper.getBoundingClientRect();
     const widthPt = rect.width * 0.75;
     const heightPt = rect.height * 0.75;
 
@@ -289,37 +302,41 @@
   }
 
   async function downloadImage() {
-    if (typeof htmlToImage === "undefined") {
+    const format = el.exportFormat.value;
+
+    if (format === "svg") {
+      if (typeof htmlToImage === "undefined") {
+        setStatus("SVG生成ライブラリの読み込みに失敗しました。ネットワーク接続を確認してください。", "is-error");
+        return;
+      }
+    } else if (typeof html2canvas === "undefined") {
       setStatus("画像生成ライブラリの読み込みに失敗しました。ネットワーク接続を確認してください。", "is-error");
       return;
     }
 
     el.downloadBtn.disabled = true;
-    const format = el.exportFormat.value;
-    setStatus(
-      format === "svg" ? "SVGを書き出しています…" : "画像を生成しています…"
-    );
+    setStatus(format === "svg" ? "SVGを書き出しています…" : "画像を生成しています…");
 
     try {
       await ensureFontsLoaded();
-
-      // Pre-build the embeddable font CSS (base64 font data) once,
-      // from our own robust fetch-and-inline routine. This is what
-      // lets the exported file keep BIZ UDGothic / BIZ UDMincho
-      // instead of silently substituting a system font.
-      const fontEmbedCss = await getFontEmbedCss();
+      // Give the browser a couple of frames to finish any layout/paint
+      // that font loading may have triggered before we snapshot it.
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
       const scale = Number(el.exportScale.value) || 3;
 
       if (format === "png") {
-        await exportPng(scale, fontEmbedCss);
+        await exportPng(scale);
       } else if (format === "svg") {
+        // Only the SVG path needs the self-contained, base64-embedded
+        // font CSS (it renders through an isolated SVG foreignObject).
+        const fontEmbedCss = await getFontEmbedCss();
         await exportSvg(fontEmbedCss);
       } else if (format === "pdf") {
         if (typeof window.jspdf === "undefined") {
           throw new Error("jsPDF not loaded");
         }
-        await exportPdf(scale, fontEmbedCss);
+        await exportPdf(scale);
       }
 
       setStatus("書き出しが完了しました。", "is-ready");
