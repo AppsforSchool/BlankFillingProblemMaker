@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>空欄補充問題メーカー｜社会科入試風・組み合わせ選択問題ジェネレーター</title>
-<meta name="description" content="岐阜県公立高校入試の社会科のような「文中の2つの空欄に当てはまる語句の正しい組み合わせを選ぶ」問題を、フォームに入力するだけで問題画像として書き出せるツールです。">
+<title>社会科入試問題メーカー｜組み合わせ選択・記述・並び替え問題ジェネレーター</title>
+<meta name="description" content="岐阜県公立高校入試の社会科のような、組み合わせ選択・記述・並び替え問題を、フォームに入力するだけで問題画像として書き出せるツールです。">
 
 <!-- Google Fonts: BIZ UDGothic / BIZ UDMincho -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,8 +21,8 @@
   <header class="app-header">
     <div class="app-header__mark" aria-hidden="true">検</div>
     <div class="app-header__text">
-      <h1>空欄補充問題メーカー</h1>
-      <p>文中の2つの空欄に当てはまる語句の「正しい組み合わせ」を選ぶ形式の問題を、入試の解答用紙のような見た目の画像に書き出します。</p>
+      <h1>社会科入試問題メーカー</h1>
+      <p>組み合わせ選択・記述・並び替え問題を、入試の解答用紙のような見た目の画像に書き出します。</p>
     </div>
   </header>
 
@@ -32,7 +32,20 @@
     <section class="editor" aria-label="問題を入力する">
 
       <div class="field-group">
-        <h2><span class="field-group__index">01</span>空欄のラベル</h2>
+        <h2><span class="field-group__index">01</span>問題形式</h2>
+        <p class="field-group__hint">作りたい問題のタイプを選んでください。</p>
+        <label class="field">
+          <span>形式</span>
+          <select id="questionFormat">
+            <option value="combo" selected>組み合わせ選択（ア～エから選ぶ）</option>
+            <option value="descriptive">記述問題（文章で答える）</option>
+            <option value="order">並び替え問題（順番を答える）</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="field-group" id="labelSection">
+        <h2><span class="field-group__index">02</span>空欄のラベル</h2>
         <p class="field-group__hint">本文中で空欄を示す文字です。1文字を推奨します（例：a, b）。</p>
         <div class="row row--two">
           <label class="field">
@@ -46,30 +59,46 @@
         </div>
       </div>
 
-      <div class="field-group">
-        <h2><span class="field-group__index">02</span>資料・本文</h2>
-        <p class="field-group__hint">枠で囲んで表示される文章です。空欄の位置に <code>{a}</code> <code>{b}</code> と入力してください（ラベルを変えても中かっこの中身は a / b のままでOKです）。</p>
-        <label class="field">
-          <span>資料タイトル（任意）</span>
-          <input type="text" id="resourceTitle" placeholder="例：［資料１］　※空欄のままなら非表示">
+      <div class="field-group" id="resourceSection">
+        <h2><span class="field-group__index">03</span>資料・本文</h2>
+        <label class="field field--checkbox">
+          <input type="checkbox" id="showResource" checked>
+          <span>資料・本文を表示する</span>
         </label>
-        <label class="field">
-          <span>本文</span>
-          <textarea id="resourceBody" rows="6">9世紀の末ごろから、「竹取物語」や紀貫之らがまとめた「{a}」など、仮名文字による文学作品が盛んに作られるようになった。また、{b}から出た天皇のきさきたちの周りには教養や才能のある女性が集められ、紫式部の「源氏物語」や清少納言の「枕草子」などが生み出された。</textarea>
-        </label>
+        <p class="field-group__hint">
+          枠で囲んで表示される文章です。空欄の位置に <code>{a}</code> <code>{b}</code>、下線を引きたい範囲は <code>[u]...[/u]</code> と入力してください。文字を選択してから「選択範囲に下線」を押すと自動で挿入されます。
+        </p>
+        <div id="resourceFields">
+          <label class="field">
+            <span>資料タイトル（任意・資料の外側左上に表示されます）</span>
+            <input type="text" id="resourceTitle" placeholder="例：［資料１］　※空欄のままなら非表示">
+          </label>
+          <label class="field">
+            <span>本文</span>
+            <textarea id="resourceBody" rows="6">9世紀の末ごろから、「竹取物語」や紀貫之らがまとめた「{a}」など、仮名文字による文学作品が盛んに作られるようになった。また、{b}から出た天皇のきさきたちの周りには教養や才能のある女性が集められ、紫式部の「源氏物語」や清少納言の「枕草子」などが生み出された。</textarea>
+            <div class="textarea-tools">
+              <button type="button" class="tool-btn" data-target="resourceBody">選択範囲に下線</button>
+            </div>
+          </label>
+        </div>
       </div>
 
       <div class="field-group">
-        <h2><span class="field-group__index">03</span>設問文</h2>
-        <p class="field-group__hint">こちらも空欄の位置に <code>{a}</code> <code>{b}</code> と入力してください。</p>
+        <h2><span class="field-group__index">04</span>設問文</h2>
+        <p class="field-group__hint">
+          空欄の位置に <code>{a}</code> <code>{b}</code>、下線は <code>[u]...[/u]</code> と入力してください（例：<code>下線①について</code> の「下線①」部分に下線を引く、など）。
+        </p>
         <label class="field">
           <span>設問文</span>
           <textarea id="questionText" rows="3">下線②について、次の{a}、{b}に当てはまる言葉の正しい組み合わせを、ア～エから一つ選び、符号で書きなさい。</textarea>
+          <div class="textarea-tools">
+            <button type="button" class="tool-btn" data-target="questionText">選択範囲に下線</button>
+          </div>
         </label>
       </div>
 
-      <div class="field-group">
-        <h2><span class="field-group__index">04</span>選択肢（ア～エ）</h2>
+      <div class="field-group" id="choicesSection">
+        <h2><span class="field-group__index">05</span>選択肢（ア～エ）</h2>
         <p class="field-group__hint">それぞれの記号について、空欄①・空欄②に入る語句を入力してください。</p>
 
         <div class="choice-row" data-symbol="ア">
@@ -102,8 +131,38 @@
         </div>
       </div>
 
+      <div class="field-group" id="orderSection">
+        <h2><span class="field-group__index">05</span>並び替える項目</h2>
+        <p class="field-group__hint">使う分だけ入力してください。空欄の項目は書き出し時に表示されません。</p>
+
+        <div class="order-row" data-symbol="ア">
+          <div class="order-row__symbol">ア</div>
+          <textarea class="orderItem" rows="2" placeholder="出来事や文を入力">天正遣欧使節が派遣された。</textarea>
+        </div>
+        <div class="order-row" data-symbol="イ">
+          <div class="order-row__symbol">イ</div>
+          <textarea class="orderItem" rows="2" placeholder="出来事や文を入力">ザビエルが鹿児島に上陸した。</textarea>
+        </div>
+        <div class="order-row" data-symbol="ウ">
+          <div class="order-row__symbol">ウ</div>
+          <textarea class="orderItem" rows="2" placeholder="出来事や文を入力">ルターが宗教改革を始めた。</textarea>
+        </div>
+        <div class="order-row" data-symbol="エ">
+          <div class="order-row__symbol">エ</div>
+          <textarea class="orderItem" rows="2" placeholder="出来事や文を入力（空欄可）"></textarea>
+        </div>
+        <div class="order-row" data-symbol="オ">
+          <div class="order-row__symbol">オ</div>
+          <textarea class="orderItem" rows="2" placeholder="出来事や文を入力（空欄可）"></textarea>
+        </div>
+        <div class="order-row" data-symbol="カ">
+          <div class="order-row__symbol">カ</div>
+          <textarea class="orderItem" rows="2" placeholder="出来事や文を入力（空欄可）"></textarea>
+        </div>
+      </div>
+
       <div class="field-group">
-        <h2><span class="field-group__index">05</span>フォント設定</h2>
+        <h2><span class="field-group__index">06</span>フォント設定</h2>
         <div class="row row--two">
           <label class="field">
             <span>資料・本文のフォント</span>
@@ -147,12 +206,16 @@
 
             <p class="q-instruction" id="prevInstruction"></p>
 
-            <div class="resource-box" id="resourceBox">
-              <div class="resource-box__title" id="prevTitle"></div>
-              <p class="resource-box__body" id="prevBody"></p>
+            <div class="resource-wrap" id="resourceWrap">
+              <div class="resource-box__title-outer" id="prevTitle"></div>
+              <div class="resource-box" id="resourceBox">
+                <p class="resource-box__body" id="prevBody"></p>
+              </div>
             </div>
 
             <div class="choices-grid" id="prevChoices"></div>
+
+            <div class="order-list" id="prevOrderItems"></div>
 
           </div>
         </div>

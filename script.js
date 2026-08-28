@@ -3,8 +3,10 @@
 
   // ---------- element refs ----------
   const el = {
+    questionFormat: document.getElementById("questionFormat"),
     labelA: document.getElementById("labelA"),
     labelB: document.getElementById("labelB"),
+    showResource: document.getElementById("showResource"),
     resourceTitle: document.getElementById("resourceTitle"),
     resourceBody: document.getElementById("resourceBody"),
     questionText: document.getElementById("questionText"),
@@ -15,9 +17,16 @@
 
     paper: document.getElementById("capture-area"),
     prevInstruction: document.getElementById("prevInstruction"),
+    resourceWrap: document.getElementById("resourceWrap"),
     prevTitle: document.getElementById("prevTitle"),
     prevBody: document.getElementById("prevBody"),
     prevChoices: document.getElementById("prevChoices"),
+    prevOrderItems: document.getElementById("prevOrderItems"),
+
+    labelSection: document.getElementById("labelSection"),
+    resourceFields: document.getElementById("resourceFields"),
+    choicesSection: document.getElementById("choicesSection"),
+    orderSection: document.getElementById("orderSection"),
 
     downloadBtn: document.getElementById("downloadBtn"),
     statusNote: document.getElementById("statusNote"),
@@ -27,29 +36,52 @@
   };
 
   const choiceRows = Array.from(document.querySelectorAll(".choice-row"));
+  const orderRows = Array.from(document.querySelectorAll(".order-row"));
 
   // ---------- helpers ----------
 
   // Safely turn a template containing the literal tokens {a} / {b}
-  // into a DocumentFragment where each token becomes a boxed <span>.
+  // (blank boxes) and [u]...[/u] (underline) into a DocumentFragment.
   // Everything else is inserted as plain text (never as HTML), so
   // user input can never break out into markup.
   function buildInlineNodes(template, labelA, labelB) {
     const frag = document.createDocumentFragment();
     const safeA = labelA && labelA.trim() ? labelA.trim() : "a";
     const safeB = labelB && labelB.trim() ? labelB.trim() : "b";
-    const parts = String(template ?? "").split(/(\{a\}|\{b\})/g);
+    const tokens = String(template ?? "").split(/(\{a\}|\{b\}|\[u\]|\[\/u\])/g);
+    let underline = false;
 
-    parts.forEach((part) => {
+    tokens.forEach((part) => {
+      if (part === "[u]") {
+        underline = true;
+        return;
+      }
+      if (part === "[/u]") {
+        underline = false;
+        return;
+      }
+      if (!part) return;
+
+      let node;
       if (part === "{a}" || part === "{b}") {
         const span = document.createElement("span");
         span.className = "blank-box";
         span.textContent = part === "{a}" ? safeA : safeB;
-        frag.appendChild(span);
-      } else if (part) {
-        frag.appendChild(document.createTextNode(part));
+        node = span;
+      } else {
+        node = document.createTextNode(part);
+      }
+
+      if (underline) {
+        const wrap = document.createElement("span");
+        wrap.className = "underline-text";
+        wrap.appendChild(node);
+        frag.appendChild(wrap);
+      } else {
+        frag.appendChild(node);
       }
     });
+
     return frag;
   }
 
@@ -62,8 +94,21 @@
     node.classList.add(mode === "gothic" ? "font-gothic" : "font-mincho");
   }
 
+  // ---------- form section visibility ----------
+  function updateFormatVisibility() {
+    const format = el.questionFormat.value;
+    el.labelSection.style.display = format === "order" ? "none" : "";
+    el.choicesSection.style.display = format === "combo" ? "" : "none";
+    el.orderSection.style.display = format === "order" ? "" : "none";
+  }
+
+  function updateResourceFieldsVisibility() {
+    el.resourceFields.style.display = el.showResource.checked ? "" : "none";
+  }
+
   // ---------- main render ----------
   function render() {
+    const format = el.questionFormat.value;
     const labelA = el.labelA.value;
     const labelB = el.labelB.value;
 
@@ -74,60 +119,120 @@
     );
     applyFontClass(el.prevInstruction, el.fontUI.value);
 
-    // resource title
-    el.prevTitle.textContent = el.resourceTitle.value.trim();
-    applyFontClass(el.prevTitle, el.fontBody.value);
+    // resource
+    if (el.showResource.checked) {
+      el.resourceWrap.style.display = "";
+      el.prevTitle.textContent = el.resourceTitle.value.trim();
+      applyFontClass(el.prevTitle, el.fontBody.value);
+      setChildren(
+        el.prevBody,
+        buildInlineNodes(el.resourceBody.value, labelA, labelB)
+      );
+      applyFontClass(el.prevBody, el.fontBody.value);
+    } else {
+      el.resourceWrap.style.display = "none";
+      el.prevTitle.textContent = "";
+      el.prevBody.textContent = "";
+    }
 
-    // resource body
-    setChildren(
-      el.prevBody,
-      buildInlineNodes(el.resourceBody.value, labelA, labelB)
-    );
-    applyFontClass(el.prevBody, el.fontBody.value);
-
-    // choices
+    // choices (組み合わせ選択のみ)
     el.prevChoices.replaceChildren();
-    choiceRows.forEach((row) => {
-      const symbol = row.dataset.symbol;
-      const valA = row.querySelector(".choiceA").value.trim();
-      const valB = row.querySelector(".choiceB").value.trim();
+    if (format === "combo") {
+      choiceRows.forEach((row) => {
+        const symbol = row.dataset.symbol;
+        const valA = row.querySelector(".choiceA").value.trim();
+        const valB = row.querySelector(".choiceB").value.trim();
 
-      const line = document.createElement("div");
-      line.className = "choice-line";
-      applyFontClass(line, el.fontUI.value);
+        const line = document.createElement("div");
+        line.className = "choice-line";
+        applyFontClass(line, el.fontUI.value);
 
-      const symbolSpan = document.createElement("span");
-      symbolSpan.className = "choice-line__symbol";
-      symbolSpan.textContent = symbol;
-      line.appendChild(symbolSpan);
+        const symbolSpan = document.createElement("span");
+        symbolSpan.className = "choice-line__symbol";
+        symbolSpan.textContent = symbol;
+        line.appendChild(symbolSpan);
 
-      const partA = document.createElement("span");
-      partA.textContent = `${labelA || "a"}＝${valA}`;
-      line.appendChild(partA);
+        const partA = document.createElement("span");
+        partA.textContent = `${labelA || "a"}＝${valA}`;
+        line.appendChild(partA);
 
-      const partB = document.createElement("span");
-      partB.textContent = `${labelB || "b"}＝${valB}`;
-      line.appendChild(partB);
+        const partB = document.createElement("span");
+        partB.textContent = `${labelB || "b"}＝${valB}`;
+        line.appendChild(partB);
 
-      el.prevChoices.appendChild(line);
-    });
+        el.prevChoices.appendChild(line);
+      });
+    }
+
+    // order items (並び替え問題のみ)
+    el.prevOrderItems.replaceChildren();
+    if (format === "order") {
+      orderRows.forEach((row) => {
+        const symbol = row.dataset.symbol;
+        const text = row.querySelector(".orderItem").value.trim();
+        if (!text) return;
+
+        const item = document.createElement("div");
+        item.className = "order-item";
+        applyFontClass(item, el.fontUI.value);
+
+        const symbolSpan = document.createElement("span");
+        symbolSpan.className = "order-item__symbol";
+        symbolSpan.textContent = symbol;
+        item.appendChild(symbolSpan);
+
+        item.appendChild(document.createTextNode(text));
+
+        el.prevOrderItems.appendChild(item);
+      });
+    }
 
     // sizing
     el.paper.style.maxWidth = `${el.paperWidth.value}px`;
     el.paper.style.setProperty("--doc-font-size", `${el.fontSize.value}px`);
   }
 
+  // ---------- underline tool buttons ----------
+  function wrapSelectionWithUnderline(textarea) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const value = textarea.value;
+    const selected = value.slice(start, end);
+    const newValue = `${value.slice(0, start)}[u]${selected}[/u]${value.slice(end)}`;
+    textarea.value = newValue;
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+
+    const newStart = start + 3; // length of "[u]"
+    const newEnd = newStart + selected.length;
+    textarea.focus();
+    textarea.setSelectionRange(newStart, newEnd);
+  }
+
+  document.querySelectorAll(".tool-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const textarea = document.getElementById(btn.dataset.target);
+      if (textarea) wrapSelectionWithUnderline(textarea);
+    });
+  });
+
   // wire up live updates
   const watchedInputs = [
-    el.labelA, el.labelB, el.resourceTitle, el.resourceBody, el.questionText,
+    el.questionFormat, el.labelA, el.labelB, el.showResource,
+    el.resourceTitle, el.resourceBody, el.questionText,
     el.fontBody, el.fontUI, el.paperWidth, el.fontSize,
     ...choiceRows.flatMap((r) => [r.querySelector(".choiceA"), r.querySelector(".choiceB")]),
+    ...orderRows.map((r) => r.querySelector(".orderItem")),
   ];
   watchedInputs.forEach((input) => {
     input.addEventListener("input", render);
     input.addEventListener("change", render);
   });
 
+  el.questionFormat.addEventListener("change", updateFormatVisibility);
+  el.showResource.addEventListener("change", updateResourceFieldsVisibility);
+
+  updateFormatVisibility();
+  updateResourceFieldsVisibility();
   render();
 
   // ---------- font readiness ----------
