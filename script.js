@@ -635,7 +635,19 @@
     zoom = 1;
     applyZoom();
     if (document.activeElement) document.activeElement.blur();
-    await new Promise((r) => setTimeout(r, 50)); // allow reflow
+    if (document.fonts && document.fonts.ready) {
+      try {
+        await Promise.all([
+          document.fonts.load('400 12pt "BIZ UDMincho"'),
+          document.fonts.load('400 12pt "BIZ UDGothic"'),
+          document.fonts.load('700 12pt "BIZ UDGothic"'),
+        ]);
+        await document.fonts.ready;
+      } catch (err) {
+        /* ignore font preload errors and continue */
+      }
+    }
+    await new Promise((r) => setTimeout(r, 80)); // allow reflow after font swap
     try {
       await fn();
     } finally {
