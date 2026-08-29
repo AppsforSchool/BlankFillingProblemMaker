@@ -159,14 +159,7 @@ function renderPreview(){
   if(questions.length === 0){
     html += `<div class="empty-msg">問題がまだありません。左のパネルから追加してください。</div>`;
   } else {
-    let currentSubject = "__init__";
     questions.forEach((q, idx) => {
-      if(q.subject !== currentSubject){
-        currentSubject = q.subject;
-        if(currentSubject){
-          html += `<div class="section-label">${escapeHtml(currentSubject)}</div>`;
-        }
-      }
       html += `
         <div class="q-block">
           <div class="q-head">
