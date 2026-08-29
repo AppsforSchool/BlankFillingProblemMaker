@@ -1,519 +1,303 @@
-(() => {
-  "use strict";
+/* ===================== 状態管理 ===================== */
+let questions = []; // {id, subject, passage, choices:[4], correct(0-3)}
+let uidSeed = 1;
 
-  // ---------- element refs ----------
-  const el = {
-    questionFormat: document.getElementById("questionFormat"),
-    labelA: document.getElementById("labelA"),
-    labelB: document.getElementById("labelB"),
-    showResource: document.getElementById("showResource"),
-    resourceTitle: document.getElementById("resourceTitle"),
-    resourceBody: document.getElementById("resourceBody"),
-    questionText: document.getElementById("questionText"),
-    fontBody: document.getElementById("fontBody"),
-    fontUI: document.getElementById("fontUI"),
-    paperWidth: document.getElementById("paperWidth"),
-    fontSize: document.getElementById("fontSize"),
-    paperPadding: document.getElementById("paperPadding"),
+function newQuestion(overrides={}){
+  return Object.assign({
+    id: uidSeed++,
+    subject: "",
+    passage: "次の文中の{a}，{b}に当てはまる言葉の正しい組み合わせを、ア～エから一つ選び、符号で書きなさい。\n\n",
+    choices: ["", "", "", ""],
+    correct: 0
+  }, overrides);
+}
 
-    paper: document.getElementById("capture-area"),
-    prevInstruction: document.getElementById("prevInstruction"),
-    resourceWrap: document.getElementById("resourceWrap"),
-    prevTitle: document.getElementById("prevTitle"),
-    prevBody: document.getElementById("prevBody"),
-    prevChoices: document.getElementById("prevChoices"),
-    prevOrderItems: document.getElementById("prevOrderItems"),
+/* ===================== サンプルデータ ===================== */
+const SAMPLE_QUESTIONS = [
+  {subject:"歴史", passage:"奈良時代、人口増加による口分田の不足に対応するため、743年、朝廷は新しく開墾した土地の永久私有を認める{a}を出した。これにより、貴族や寺社による{b}が進み、公地公民の原則がくずれ始めた。",
+   choices:["墾田永年私財法／私有地の拡大（荘園の形成）","墾田永年私財法／土地の国有化","三世一身法／私有地の拡大（荘園の形成）","三世一身法／土地の国有化"], correct:0},
+  {subject:"歴史", passage:"1221年、後鳥羽上皇が鎌倉幕府打倒を目指して兵をあげたが敗れた。この争いを{a}という。幕府はこの後、京都に{b}を置いて朝廷を監視するとともに、西国の武士の統率にあたらせた。",
+   choices:["承久の乱／六波羅探題","承久の乱／鎌倉府","応仁の乱／六波羅探題","応仁の乱／鎌倉府"], correct:0},
+  {subject:"歴史", passage:"18世紀後半、老中の田沼意次は、商工業者の同業者組織である株仲間の結成を{a}し、営業税を徴収することで幕府の財政を立て直そうとした。しかし、あとを継いだ老中松平定信は、質素・倹約を奨励する{b}と呼ばれる改革を行った。",
+   choices:["奨励／寛政の改革","奨励／天保の改革","禁止／寛政の改革","禁止／天保の改革"], correct:0},
+  {subject:"地理", passage:"乾燥帯のうち、年間を通じてほとんど雨が降らない気候を{a}といい、わずかながら雨季があり丈の短い草原が広がる気候を{b}という。",
+   choices:["砂漠気候／ステップ気候","砂漠気候／温帯冬季少雨気候","サバナ気候／ステップ気候","サバナ気候／温帯冬季少雨気候"], correct:0},
+  {subject:"地理", passage:"本州中央部を南北に走る溝状の地形を{a}といい、その西の縁にあたる糸魚川・静岡構造線を境に、東日本と西日本では山地の走る方向が大きく異なる。また、九州から関東地方まで日本列島を東西に横断する断層帯を{b}という。",
+   choices:["フォッサマグナ／中央構造線","フォッサマグナ／環太平洋造山帯","リアス海岸／中央構造線","リアス海岸／環太平洋造山帯"], correct:0},
+  {subject:"地理", passage:"高度経済成長期以降、大都市では都心部の人口が減り、郊外の人口が増える{a}現象が見られたが、近年は大都市の再開発が進み、都心部の人口が再び増える{b}現象も見られるようになった。",
+   choices:["ドーナツ化／都心回帰","ドーナツ化／地方創生","過疎化／都心回帰","過疎化／地方創生"], correct:0}
+];
 
-    labelSection: document.getElementById("labelSection"),
-    labelRow: document.getElementById("labelRow"),
-    labelBField: document.getElementById("labelBField"),
-    labelASpan: document.getElementById("labelASpan"),
-    resourceFields: document.getElementById("resourceFields"),
-    choicesSection: document.getElementById("choicesSection"),
-    orderSection: document.getElementById("orderSection"),
+/* ===================== ユーティリティ ===================== */
+function escapeHtml(str){
+  return (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function formatPassage(str){
+  const escaped = escapeHtml(str).replace(/\n/g, "<br>");
+  return escaped.replace(/\{([a-zA-Zａ-ｚＡ-Ｚ])\}/g, (m, letter) => `<span class="blank">${letter}</span>`);
+}
+const KIGO = ["ア","イ","ウ","エ"];
 
-    downloadBtn: document.getElementById("downloadBtn"),
-    statusNote: document.getElementById("statusNote"),
-    exportFormat: document.getElementById("exportFormat"),
-    exportScale: document.getElementById("exportScale"),
-    scaleField: document.getElementById("scaleField"),
-  };
+/* ===================== エディタ描画 ===================== */
+const editorList = document.getElementById('editor-list');
 
-  const choiceRows = Array.from(document.querySelectorAll(".choice-row"));
-  const orderRows = Array.from(document.querySelectorAll(".order-row"));
-
-  // ---------- helpers ----------
-
-  // Safely turn a template containing the literal tokens {a} / {b}
-  // (blank boxes) and [u]...[/u] (underline) into a DocumentFragment.
-  // Everything else is inserted as plain text (never as HTML), so
-  // user input can never break out into markup. When `wide` is true
-  // (記述問題: a single, wider blank for a written answer) the blank
-  // box gets an extra modifier class.
-  function buildInlineNodes(template, labelA, labelB, wide) {
-    const frag = document.createDocumentFragment();
-    const safeA = labelA && labelA.trim() ? labelA.trim() : "a";
-    const safeB = labelB && labelB.trim() ? labelB.trim() : "b";
-    const tokens = String(template ?? "").split(/(\{a\}|\{b\}|\[u\]|\[\/u\])/g);
-    let underline = false;
-
-    tokens.forEach((part) => {
-      if (part === "[u]") {
-        underline = true;
-        return;
-      }
-      if (part === "[/u]") {
-        underline = false;
-        return;
-      }
-      if (!part) return;
-
-      let node;
-      if (part === "{a}" || part === "{b}") {
-        const span = document.createElement("span");
-        span.className = wide ? "blank-box blank-box--wide" : "blank-box";
-        span.textContent = part === "{a}" ? safeA : safeB;
-        node = span;
-      } else {
-        node = document.createTextNode(part);
-      }
-
-      if (underline) {
-        const wrap = document.createElement("span");
-        wrap.className = "underline-text";
-        wrap.appendChild(node);
-        frag.appendChild(wrap);
-      } else {
-        frag.appendChild(node);
-      }
-    });
-
-    return frag;
+function renderEditor(){
+  editorList.innerHTML = "";
+  if(questions.length === 0){
+    editorList.innerHTML = '<div class="empty-msg" style="padding:20px 0;">「＋ 問題を追加」または「サンプルを読み込む」から始めてください。</div>';
+    return;
   }
-
-  function setChildren(node, fragment) {
-    node.replaceChildren(fragment);
-  }
-
-  function applyFontClass(node, mode) {
-    node.classList.remove("font-gothic", "font-mincho");
-    node.classList.add(mode === "gothic" ? "font-gothic" : "font-mincho");
-  }
-
-  // ---------- form section visibility ----------
-  function updateFormatVisibility() {
-    const format = el.questionFormat.value;
-    el.labelSection.style.display = format === "order" ? "none" : "";
-    el.choicesSection.style.display = format === "combo" ? "" : "none";
-    el.orderSection.style.display = format === "order" ? "" : "none";
-
-    // 記述問題は空欄が1つだけなので、空欄②の入力欄は隠す。
-    const isDescriptive = format === "descriptive";
-    el.labelBField.style.display = isDescriptive ? "none" : "";
-    el.labelRow.style.gridTemplateColumns = isDescriptive ? "1fr" : "1fr 1fr";
-    el.labelASpan.textContent = isDescriptive ? "空欄のラベル" : "空欄①のラベル";
-  }
-
-  function updateResourceFieldsVisibility() {
-    el.resourceFields.style.display = el.showResource.checked ? "" : "none";
-  }
-
-  // ---------- main render ----------
-  function render() {
-    const format = el.questionFormat.value;
-    const isDescriptive = format === "descriptive";
-    const labelA = el.labelA.value;
-    const labelB = el.labelB.value;
-
-    // instruction line
-    setChildren(
-      el.prevInstruction,
-      buildInlineNodes(el.questionText.value, labelA, labelB, isDescriptive)
-    );
-    applyFontClass(el.prevInstruction, el.fontUI.value);
-
-    // resource
-    if (el.showResource.checked) {
-      el.resourceWrap.style.display = "";
-      el.prevTitle.textContent = el.resourceTitle.value.trim();
-      applyFontClass(el.prevTitle, el.fontBody.value);
-      setChildren(
-        el.prevBody,
-        buildInlineNodes(el.resourceBody.value, labelA, labelB, isDescriptive)
-      );
-      applyFontClass(el.prevBody, el.fontBody.value);
-    } else {
-      el.resourceWrap.style.display = "none";
-      el.prevTitle.textContent = "";
-      el.prevBody.textContent = "";
-    }
-
-    // choices (組み合わせ選択のみ)
-    el.prevChoices.replaceChildren();
-    if (format === "combo") {
-      choiceRows.forEach((row) => {
-        const symbol = row.dataset.symbol;
-        const valA = row.querySelector(".choiceA").value.trim();
-        const valB = row.querySelector(".choiceB").value.trim();
-
-        const line = document.createElement("div");
-        line.className = "choice-line";
-        applyFontClass(line, el.fontUI.value);
-
-        const symbolSpan = document.createElement("span");
-        symbolSpan.className = "choice-line__symbol";
-        symbolSpan.textContent = symbol;
-        line.appendChild(symbolSpan);
-
-        const partA = document.createElement("span");
-        partA.textContent = `${labelA || "a"}＝${valA}`;
-        line.appendChild(partA);
-
-        const partB = document.createElement("span");
-        partB.textContent = `${labelB || "b"}＝${valB}`;
-        line.appendChild(partB);
-
-        el.prevChoices.appendChild(line);
-      });
-    }
-
-    // order items (並び替え問題のみ)
-    el.prevOrderItems.replaceChildren();
-    if (format === "order") {
-      orderRows.forEach((row) => {
-        const symbol = row.dataset.symbol;
-        const text = row.querySelector(".orderItem").value.trim();
-        if (!text) return;
-
-        const item = document.createElement("div");
-        item.className = "order-item";
-        applyFontClass(item, el.fontUI.value);
-
-        const symbolSpan = document.createElement("span");
-        symbolSpan.className = "order-item__symbol";
-        symbolSpan.textContent = symbol;
-        item.appendChild(symbolSpan);
-
-        item.appendChild(document.createTextNode(text));
-
-        el.prevOrderItems.appendChild(item);
-      });
-    }
-
-    // sizing
-    el.paper.style.maxWidth = `${el.paperWidth.value}px`;
-    el.paper.style.setProperty("--doc-font-size", `${el.fontSize.value}px`);
-    el.paper.style.setProperty("--paper-padding", `${el.paperPadding.value}px`);
-  }
-
-  // ---------- underline tool buttons ----------
-  function wrapSelectionWithUnderline(textarea) {
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const value = textarea.value;
-    const selected = value.slice(start, end);
-    const newValue = `${value.slice(0, start)}[u]${selected}[/u]${value.slice(end)}`;
-    textarea.value = newValue;
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
-
-    const newStart = start + 3; // length of "[u]"
-    const newEnd = newStart + selected.length;
-    textarea.focus();
-    textarea.setSelectionRange(newStart, newEnd);
-  }
-
-  document.querySelectorAll(".tool-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const textarea = document.getElementById(btn.dataset.target);
-      if (textarea) wrapSelectionWithUnderline(textarea);
-    });
+  questions.forEach((q, idx) => {
+    const card = document.createElement('div');
+    card.className = 'edit-card';
+    card.dataset.id = q.id;
+    card.innerHTML = `
+      <div class="edit-card-head">
+        <span class="qidx">問${idx+1}</span>
+        <input type="text" class="subject-input" placeholder="教科ラベル（例: 歴史）" value="${escapeHtml(q.subject)}">
+        <button class="mini-btn" data-act="up">↑</button>
+        <button class="mini-btn" data-act="down">↓</button>
+        <button class="mini-btn" data-act="dup">複製</button>
+        <button class="mini-btn danger" data-act="del">削除</button>
+      </div>
+      <label class="field-label">問題文（空所は {a} {b} のように書くと四角囲みの空欄になります）</label>
+      <textarea class="passage-input" data-act="passage" rows="4">${escapeHtml(q.passage)}</textarea>
+      <label class="field-label">選択肢</label>
+      <div class="choice-grid">
+        ${[0,1,2,3].map(i => `
+          <div class="choice-row">
+            <span class="kigo">${KIGO[i]}</span>
+            <input type="text" data-act="choice" data-idx="${i}" value="${escapeHtml(q.choices[i])}">
+          </div>`).join('')}
+      </div>
+      <div class="correct-row">
+        正解（解答一覧用・任意）:
+        <select data-act="correct">
+          ${[0,1,2,3].map(i => `<option value="${i}" ${q.correct===i?'selected':''}>${KIGO[i]}</option>`).join('')}
+        </select>
+      </div>
+    `;
+    editorList.appendChild(card);
   });
+}
 
-  // wire up live updates
-  const watchedInputs = [
-    el.questionFormat, el.labelA, el.labelB, el.showResource,
-    el.resourceTitle, el.resourceBody, el.questionText,
-    el.fontBody, el.fontUI, el.paperWidth, el.fontSize, el.paperPadding,
-    ...choiceRows.flatMap((r) => [r.querySelector(".choiceA"), r.querySelector(".choiceB")]),
-    ...orderRows.map((r) => r.querySelector(".orderItem")),
-  ];
-  watchedInputs.forEach((input) => {
-    input.addEventListener("input", render);
-    input.addEventListener("change", render);
-  });
+function findQuestion(id){
+  return questions.find(q => q.id === Number(id));
+}
 
-  el.questionFormat.addEventListener("change", updateFormatVisibility);
-  el.showResource.addEventListener("change", updateResourceFieldsVisibility);
+editorList.addEventListener('input', (e) => {
+  const card = e.target.closest('.edit-card');
+  if(!card) return;
+  const q = findQuestion(card.dataset.id);
+  if(!q) return;
+  const act = e.target.dataset.act;
 
-  updateFormatVisibility();
-  updateResourceFieldsVisibility();
-  render();
-
-  // ---------- font readiness ----------
-  function setStatus(text, mode) {
-    el.statusNote.textContent = text;
-    el.statusNote.classList.remove("is-ready", "is-error");
-    if (mode) el.statusNote.classList.add(mode);
+  if(e.target.classList.contains('subject-input')){
+    q.subject = e.target.value;
+  } else if(act === 'passage'){
+    q.passage = e.target.value;
+  } else if(act === 'choice'){
+    q.choices[Number(e.target.dataset.idx)] = e.target.value;
+  } else if(act === 'correct'){
+    q.correct = Number(e.target.value);
   }
+  renderPreview();
+});
 
-  if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(() => {
-      setStatus("フォントの読み込みが完了しました。画像を生成できます。", "is-ready");
-    });
+editorList.addEventListener('click', (e) => {
+  const btn = e.target.closest('.mini-btn');
+  if(!btn) return;
+  const card = e.target.closest('.edit-card');
+  const id = Number(card.dataset.id);
+  const idx = questions.findIndex(q => q.id === id);
+  if(idx === -1) return;
+
+  const act = btn.dataset.act;
+  if(act === 'del'){
+    questions.splice(idx, 1);
+  } else if(act === 'up' && idx > 0){
+    [questions[idx-1], questions[idx]] = [questions[idx], questions[idx-1]];
+  } else if(act === 'down' && idx < questions.length-1){
+    [questions[idx+1], questions[idx]] = [questions[idx], questions[idx+1]];
+  } else if(act === 'dup'){
+    const copy = JSON.parse(JSON.stringify(questions[idx]));
+    copy.id = uidSeed++;
+    questions.splice(idx+1, 0, copy);
+  }
+  renderEditor();
+  renderPreview();
+});
+
+/* ===================== プレビュー描画 ===================== */
+function renderPreview(){
+  const sheet = document.getElementById('preview-sheet');
+  const kind = document.getElementById('cover-kind').value;
+  const title = document.getElementById('cover-title').value;
+  const sub = document.getElementById('cover-sub').value;
+  const noticeText = document.getElementById('notice-text').value;
+  const showAnswerKey = document.getElementById('toggle-answerkey').checked;
+
+  let html = `
+    <div class="cover">
+      <div class="kind">${escapeHtml(kind)}</div>
+      <h1>${escapeHtml(title)}</h1>
+      ${sub ? `<div class="sub">${escapeHtml(sub)}</div>` : ''}
+    </div>
+    ${noticeText.trim() ? `
+    <div class="notice">
+      <div class="notice-title">注　意</div>
+      ${escapeHtml(noticeText).split('\n').filter(l=>l.trim()).map((l,i)=>`${i+1}　${l}`).join('<br>')}
+    </div>` : ''}
+  `;
+
+  if(questions.length === 0){
+    html += `<div class="empty-msg">問題がまだありません。左のパネルから追加してください。</div>`;
   } else {
-    setStatus("画像を生成できます。", "is-ready");
-  }
-
-  el.exportFormat.addEventListener("change", () => {
-    const isSvg = el.exportFormat.value === "svg";
-    el.scaleField.style.display = isSvg ? "none" : "";
-    document.getElementById("svgNote").style.display = isSvg ? "" : "none";
-  });
-
-  // ---------- robust Google Fonts embedding ----------
-  // html-to-image's built-in font auto-detection can be unreliable
-  // (it has to guess which @font-face rules apply to the captured
-  // node). Instead, we fetch the exact Google Fonts stylesheet we
-  // already load in <head>, download every referenced font file
-  // ourselves, and rewrite the CSS to use base64 data URIs. This
-  // gives html-to-image a guaranteed-correct, self-contained
-  // stylesheet to embed — no auto-detection involved.
-
-  let cachedFontEmbedCssPromise = null;
-
-  function arrayBufferToBase64(buffer) {
-    let binary = "";
-    const bytes = new Uint8Array(buffer);
-    const chunkSize = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
-    }
-    return btoa(binary);
-  }
-
-  function guessFontMime(url) {
-    if (url.endsWith(".woff2")) return "font/woff2";
-    if (url.endsWith(".woff")) return "font/woff";
-    if (url.endsWith(".ttf")) return "font/ttf";
-    return "application/octet-stream";
-  }
-
-  async function buildEmbeddedGoogleFontCss() {
-    const link = document.querySelector('link[href*="fonts.googleapis.com"]');
-    if (!link) throw new Error("Google Fonts <link> not found");
-
-    const cssRes = await fetch(link.href, { mode: "cors" });
-    if (!cssRes.ok) throw new Error(`Google Fonts CSS fetch failed: ${cssRes.status}`);
-    let cssText = await cssRes.text();
-
-    // "font-display: swap" tells the browser it's fine to paint with a
-    // fallback font first and swap in the real font later. That's a
-    // reasonable default for normal page loads, but it's actively harmful
-    // for a one-shot offscreen SVG->canvas snapshot (used by the SVG
-    // export path below): the snapshot can get taken during the fallback
-    // phase, or mid-swap, which is exactly what produced the wrong-font /
-    // overlapping-glyph artifacts. "block" makes the browser wait
-    // (briefly) for the real font instead.
-    cssText = cssText.replace(/font-display:\s*swap\s*;?/gi, "font-display: block;");
-
-    const urlRegex = /url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g;
-    const fontUrls = [...new Set([...cssText.matchAll(urlRegex)].map((m) => m[1]))];
-
-    await Promise.all(
-      fontUrls.map(async (fontUrl) => {
-        const fontRes = await fetch(fontUrl, { mode: "cors" });
-        if (!fontRes.ok) throw new Error(`Font file fetch failed: ${fontUrl}`);
-        const buf = await fontRes.arrayBuffer();
-        const dataUri = `data:${guessFontMime(fontUrl)};base64,${arrayBufferToBase64(buf)}`;
-        cssText = cssText.split(fontUrl).join(dataUri);
-      })
-    );
-
-    return cssText;
-  }
-
-  // Computed once and reused for every export in this session.
-  async function getFontEmbedCss() {
-    if (!cachedFontEmbedCssPromise) {
-      cachedFontEmbedCssPromise = buildEmbeddedGoogleFontCss().catch(async (err) => {
-        console.warn("Custom font embedding failed, falling back to html-to-image's auto-detection.", err);
-        cachedFontEmbedCssPromise = null; // allow retry next time
-        return htmlToImage.getFontEmbedCSS(el.paper);
-      });
-    }
-    return cachedFontEmbedCssPromise;
-  }
-
-  // ---------- export ----------
-  function triggerDownload(href, filename) {
-    const link = document.createElement("a");
-    link.href = href;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  }
-
-  function timestamp() {
-    return new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
-  }
-
-  async function renderCanvas(scale) {
-    return html2canvas(el.paper, {
-      backgroundColor: "#ffffff",
-      scale,
-      useCORS: true,
-    });
-  }
-
-  async function exportPng(scale) {
-    const canvas = await renderCanvas(scale);
-    const dataUrl = canvas.toDataURL("image/png");
-    triggerDownload(dataUrl, `mondai_${timestamp()}.png`);
-  }
-
-  async function exportSvg(fontEmbedCss) {
-    const dataUrl = await htmlToImage.toSvg(el.paper, {
-      backgroundColor: "#ffffff",
-      cacheBust: true,
-      fontEmbedCss,
-    });
-
-    let svgText = dataUrlToText(dataUrl);
-    svgText = sanitizeSvgFontQuotes(svgText);
-
-    const blob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
-    const blobUrl = URL.createObjectURL(blob);
-    triggerDownload(blobUrl, `mondai_${timestamp()}.svg`);
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-  }
-
-  // html-to-image's toSvg() returns a data: URL. Decode it back to a
-  // plain XML string so we can patch it before saving.
-  function dataUrlToText(dataUrl) {
-    const commaIndex = dataUrl.indexOf(",");
-    const header = dataUrl.slice(0, commaIndex);
-    const body = dataUrl.slice(commaIndex + 1);
-    if (/;base64/i.test(header)) {
-      const binary = atob(body);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      return new TextDecoder("utf-8").decode(bytes);
-    }
-    return decodeURIComponent(body);
-  }
-
-  // When a computed style is serialized into the SVG's HTML (inside a
-  // foreignObject), multi-word font names like "BIZ UDGothic" get
-  // wrapped in quotes so they parse as a single family name. If that
-  // quoted value then gets embedded inside an attribute delimited by
-  // the same quote character, the result is invalid XML ("AttValue: '
-  // expected" when a strict parser opens the file). Since every family
-  // name we use is known in advance, we simply strip the quotes around
-  // each one wherever they appear — unquoted multi-word family names
-  // are valid CSS, so nothing is lost, and the quote-clash disappears.
-  function sanitizeSvgFontQuotes(svgText) {
-    const familyNames = [
-      "BIZ UDGothic",
-      "BIZ UDMincho",
-      "Hiragino Sans",
-      "Hiragino Mincho ProN",
-      "Yu Gothic",
-      "Yu Mincho",
-    ];
-    let result = svgText;
-    familyNames.forEach((name) => {
-      const pattern = new RegExp(`["']${name}["']`, "g");
-      result = result.replace(pattern, name);
-    });
-    return result;
-  }
-
-  async function exportPdf(scale) {
-    const canvas = await renderCanvas(scale);
-    const dataUrl = canvas.toDataURL("image/png");
-
-    // CSS px -> pt (1px = 0.75pt at 96dpi). Page size follows the sheet's
-    // on-screen size; the render scale only affects the embedded image's
-    // resolution, not the physical page size.
-    const rect = el.paper.getBoundingClientRect();
-    const widthPt = rect.width * 0.75;
-    const heightPt = rect.height * 0.75;
-
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({
-      orientation: widthPt >= heightPt ? "landscape" : "portrait",
-      unit: "pt",
-      format: [widthPt, heightPt],
-    });
-    pdf.addImage(dataUrl, "PNG", 0, 0, widthPt, heightPt, undefined, "FAST");
-    pdf.save(`mondai_${timestamp()}.pdf`);
-  }
-
-  // Force the browser to actually fetch every weight of both custom
-  // fonts before we ask html-to-image to embed them. Without this,
-  // a weight that has never been used on screen (e.g. a bold variant
-  // only needed for an empty/optional field) may be missing from
-  // document.fonts, and the exporter silently falls back to a
-  // system font for it.
-  async function ensureFontsLoaded() {
-    if (!(document.fonts && document.fonts.load)) return;
-    const specs = [
-      '400 16px "BIZ UDGothic"',
-      '700 16px "BIZ UDGothic"',
-      '400 16px "BIZ UDMincho"',
-      '700 16px "BIZ UDMincho"',
-    ];
-    await Promise.all(specs.map((s) => document.fonts.load(s).catch(() => null)));
-    if (document.fonts.ready) await document.fonts.ready;
-  }
-
-  async function downloadImage() {
-    const format = el.exportFormat.value;
-
-    if (format === "svg") {
-      if (typeof htmlToImage === "undefined") {
-        setStatus("SVG生成ライブラリの読み込みに失敗しました。ネットワーク接続を確認してください。", "is-error");
-        return;
-      }
-    } else if (typeof html2canvas === "undefined") {
-      setStatus("画像生成ライブラリの読み込みに失敗しました。ネットワーク接続を確認してください。", "is-error");
-      return;
-    }
-
-    el.downloadBtn.disabled = true;
-    setStatus(format === "svg" ? "SVGを書き出しています…" : "画像を生成しています…");
-
-    try {
-      await ensureFontsLoaded();
-      // Give the browser a couple of frames to finish any layout/paint
-      // that font loading may have triggered before we snapshot it.
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-      const scale = Number(el.exportScale.value) || 3;
-
-      if (format === "png") {
-        await exportPng(scale);
-      } else if (format === "svg") {
-        // Only the SVG path needs the self-contained, base64-embedded
-        // font CSS (it renders through an isolated SVG foreignObject).
-        const fontEmbedCss = await getFontEmbedCss();
-        await exportSvg(fontEmbedCss);
-      } else if (format === "pdf") {
-        if (typeof window.jspdf === "undefined") {
-          throw new Error("jsPDF not loaded");
+    let currentSubject = "__init__";
+    questions.forEach((q, idx) => {
+      if(q.subject !== currentSubject){
+        currentSubject = q.subject;
+        if(currentSubject){
+          html += `<div class="section-label">${escapeHtml(currentSubject)}</div>`;
         }
-        await exportPdf(scale);
       }
+      html += `
+        <div class="q-block">
+          <div class="q-head">
+            <span class="q-num">問${idx+1}</span>
+            ${q.subject ? `<span class="q-tag">${escapeHtml(q.subject)}</span>` : ''}
+          </div>
+          <div class="q-passage">${formatPassage(q.passage)}</div>
+          <ul class="choices">
+            ${q.choices.map((c,i) => `<li><span class="kigo">${KIGO[i]}</span><span>${escapeHtml(c)}</span></li>`).join('')}
+          </ul>
+        </div>
+      `;
+    });
 
-      setStatus("書き出しが完了しました。", "is-ready");
-    } catch (err) {
-      console.error(err);
-      setStatus("書き出しに失敗しました。時間をおいて再度お試しください。", "is-error");
-    } finally {
-      el.downloadBtn.disabled = false;
+    if(showAnswerKey){
+      html += `
+        <div class="answerkey">
+          <h3>解答</h3>
+          <table><tbody>
+            <tr>${questions.map((q,idx) => `<td class="head">問${idx+1}</td>`).join('')}</tr>
+            <tr>${questions.map(q => `<td>${KIGO[q.correct]}</td>`).join('')}</tr>
+          </tbody></table>
+        </div>
+      `;
     }
   }
 
-  el.downloadBtn.addEventListener("click", downloadImage);
-})();
+  sheet.innerHTML = html;
+}
+
+/* ===================== ボタン類 ===================== */
+document.getElementById('add-question-btn').addEventListener('click', () => {
+  questions.push(newQuestion());
+  renderEditor();
+  renderPreview();
+});
+
+document.getElementById('load-sample-btn').addEventListener('click', () => {
+  SAMPLE_QUESTIONS.forEach(s => questions.push(newQuestion(s)));
+  renderEditor();
+  renderPreview();
+});
+
+document.getElementById('clear-all-btn').addEventListener('click', () => {
+  if(questions.length && !confirm('全ての問題を削除します。よろしいですか？')) return;
+  questions = [];
+  renderEditor();
+  renderPreview();
+});
+
+document.querySelectorAll('.cover-fields input, .cover-fields textarea, #toggle-answerkey')
+  .forEach(el => el.addEventListener('input', renderPreview));
+
+/* ---- JSON 保存・読み込み ---- */
+document.getElementById('save-json-btn').addEventListener('click', () => {
+  const data = {
+    cover:{
+      kind: document.getElementById('cover-kind').value,
+      title: document.getElementById('cover-title').value,
+      sub: document.getElementById('cover-sub').value,
+      notice: document.getElementById('notice-text').value,
+      showAnswerKey: document.getElementById('toggle-answerkey').checked
+    },
+    questions
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'social_exam_data.json';
+  a.click();
+});
+
+document.getElementById('load-json-btn').addEventListener('click', () => {
+  document.getElementById('json-file-input').click();
+});
+document.getElementById('json-file-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const data = JSON.parse(reader.result);
+      if(data.cover){
+        document.getElementById('cover-kind').value = data.cover.kind || "";
+        document.getElementById('cover-title').value = data.cover.title || "";
+        document.getElementById('cover-sub').value = data.cover.sub || "";
+        document.getElementById('notice-text').value = data.cover.notice || "";
+        document.getElementById('toggle-answerkey').checked = !!data.cover.showAnswerKey;
+      }
+      questions = (data.questions || []).map(q => newQuestion(q));
+      renderEditor();
+      renderPreview();
+    }catch(err){
+      alert('JSONの読み込みに失敗しました: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
+/* ---- 書き出し ---- */
+document.getElementById('export-png-btn').addEventListener('click', async () => {
+  const sheet = document.getElementById('preview-sheet');
+  const canvas = await html2canvas(sheet, {scale:2, backgroundColor:'#fbf9f4'});
+  const a = document.createElement('a');
+  a.download = 'social_exam.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+});
+
+document.getElementById('export-pdf-btn').addEventListener('click', async () => {
+  const sheet = document.getElementById('preview-sheet');
+  const canvas = await html2canvas(sheet, {scale:2, backgroundColor:'#fbf9f4'});
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p', 'pt', 'a4');
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const imgWidth = pageWidth;
+  const imgHeight = canvas.height * imgWidth / canvas.width;
+  const imgData = canvas.toDataURL('image/png');
+
+  let heightLeft = imgHeight;
+  let position = 0;
+  pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+  heightLeft -= pageHeight;
+  while(heightLeft > 0){
+    position = heightLeft - imgHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
+  pdf.save('social_exam.pdf');
+});
+
+document.getElementById('print-btn').addEventListener('click', () => window.print());
+
+/* ===================== 初期化 ===================== */
+SAMPLE_QUESTIONS.slice(0,3).forEach(s => questions.push(newQuestion(s)));
+renderEditor();
+renderPreview();

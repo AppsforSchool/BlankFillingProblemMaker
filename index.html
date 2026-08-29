@@ -3,271 +3,78 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>社会科入試問題メーカー｜組み合わせ選択・記述・並び替え問題ジェネレーター</title>
-<meta name="description" content="岐阜県公立高校入試の社会科のような、組み合わせ選択・記述・並び替え問題を、フォームに入力するだけで問題画像として書き出せるツールです。">
-
-<!-- Google Fonts: BIZ UDGothic / BIZ UDMincho -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic:wght@400;700&family=BIZ+UDMincho:wght@400;700&display=swap" rel="stylesheet" crossorigin="anonymous">
-
+<title>社会　問題エディタ ― 検査問題ジェネレーター</title>
 <link rel="stylesheet" href="style.css">
+<!-- 画像・PDF書き出し用の外部ライブラリ（バニラJSのみで自作するのが困難な部分のみCDNを利用） -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
-<div class="app">
+<div class="topbar">
+  <h1>社会　問題エディタ</h1>
+  <div class="file-actions">
+    <button class="btn" id="save-json-btn">保存(JSON)</button>
+    <button class="btn" id="load-json-btn">読み込み(JSON)</button>
+    <input type="file" id="json-file-input" accept="application/json" style="display:none;">
+  </div>
+</div>
 
-  <!-- ===== Header ===== -->
-  <header class="app-header">
-    <div class="app-header__mark" aria-hidden="true">検</div>
-    <div class="app-header__text">
-      <h1>社会科入試問題メーカー</h1>
-      <p>組み合わせ選択・記述・並び替え問題を、入試の解答用紙のような見た目の画像に書き出します。</p>
+<div class="layout">
+
+  <!-- ============ 編集パネル ============ -->
+  <div class="editor-panel">
+    <h2>表紙・注意事項</h2>
+    <div class="cover-fields">
+      <label>種別
+        <input type="text" id="cover-kind" value="検査問題">
+      </label>
+      <label>科目タイトル
+        <input type="text" id="cover-title" value="社会">
+      </label>
+      <label>サブタイトル
+        <input type="text" id="cover-sub" value="">
+      </label>
+      <label>注意事項（改行で箇条書きになります）
+        <textarea id="notice-text">答えは、全て解答用紙に記入しなさい。
+検査問題は　ページで、問題は１から３まであります。</textarea>
+      </label>
+      <label class="option-toggle">
+        <input type="checkbox" id="toggle-answerkey">
+        末尾に解答一覧を付ける
+      </label>
     </div>
-  </header>
 
-  <div class="app-body">
+    <h2>問題一覧</h2>
+    <div class="add-row">
+      <button class="btn light" id="add-question-btn">＋ 問題を追加</button>
+      <button class="btn light" id="load-sample-btn">サンプルを読み込む</button>
+      <button class="btn light" id="clear-all-btn">全て削除</button>
+    </div>
 
-    <!-- ===== Editor (left) ===== -->
-    <section class="editor" aria-label="問題を入力する">
-
-      <div class="field-group">
-        <h2><span class="field-group__index">01</span>問題形式</h2>
-        <p class="field-group__hint">作りたい問題のタイプを選んでください。</p>
-        <label class="field">
-          <span>形式</span>
-          <select id="questionFormat">
-            <option value="combo" selected>組み合わせ選択（ア～エから選ぶ）</option>
-            <option value="descriptive">記述問題（文章で答える）</option>
-            <option value="order">並び替え問題（順番を答える）</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="field-group" id="labelSection">
-        <h2><span class="field-group__index">02</span>空欄のラベル</h2>
-        <p class="field-group__hint">本文中で空欄を示す文字です。1文字を推奨します（例：a, b）。</p>
-        <div class="row row--two" id="labelRow">
-          <label class="field">
-            <span id="labelASpan">空欄①のラベル</span>
-            <input type="text" id="labelA" maxlength="4" value="a">
-          </label>
-          <label class="field" id="labelBField">
-            <span>空欄②のラベル</span>
-            <input type="text" id="labelB" maxlength="4" value="b">
-          </label>
-        </div>
-      </div>
-
-      <div class="field-group" id="resourceSection">
-        <h2><span class="field-group__index">03</span>資料・本文</h2>
-        <label class="field field--checkbox">
-          <input type="checkbox" id="showResource" checked>
-          <span>資料・本文を表示する</span>
-        </label>
-        <p class="field-group__hint">
-          枠で囲んで表示される文章です。空欄の位置に <code>{a}</code> <code>{b}</code>、下線を引きたい範囲は <code>[u]...[/u]</code> と入力してください。文字を選択してから「選択範囲に下線」を押すと自動で挿入されます。
-        </p>
-        <div id="resourceFields">
-          <label class="field">
-            <span>資料タイトル（任意・資料の外側左上に表示されます）</span>
-            <input type="text" id="resourceTitle" placeholder="例：［資料１］　※空欄のままなら非表示">
-          </label>
-          <label class="field">
-            <span>本文</span>
-            <textarea id="resourceBody" rows="6">9世紀の末ごろから、「竹取物語」や紀貫之らがまとめた「{a}」など、仮名文字による文学作品が盛んに作られるようになった。また、{b}から出た天皇のきさきたちの周りには教養や才能のある女性が集められ、紫式部の「源氏物語」や清少納言の「枕草子」などが生み出された。</textarea>
-            <div class="textarea-tools">
-              <button type="button" class="tool-btn" data-target="resourceBody">選択範囲に下線</button>
-            </div>
-          </label>
-        </div>
-      </div>
-
-      <div class="field-group">
-        <h2><span class="field-group__index">04</span>設問文</h2>
-        <p class="field-group__hint">
-          空欄の位置に <code>{a}</code> <code>{b}</code>、下線は <code>[u]...[/u]</code> と入力してください（例：<code>下線①について</code> の「下線①」部分に下線を引く、など）。
-        </p>
-        <label class="field">
-          <span>設問文</span>
-          <textarea id="questionText" rows="3">下線②について、次の{a}、{b}に当てはまる言葉の正しい組み合わせを、ア～エから一つ選び、符号で書きなさい。</textarea>
-          <div class="textarea-tools">
-            <button type="button" class="tool-btn" data-target="questionText">選択範囲に下線</button>
-          </div>
-        </label>
-      </div>
-
-      <div class="field-group" id="choicesSection">
-        <h2><span class="field-group__index">05</span>選択肢（ア～エ）</h2>
-        <p class="field-group__hint">それぞれの記号について、空欄①・空欄②に入る語句を入力してください。</p>
-
-        <div class="choice-row" data-symbol="ア">
-          <div class="choice-row__symbol">ア</div>
-          <div class="choice-row__inputs">
-            <input type="text" class="choiceA" placeholder="空欄①の語句" value="古今和歌集">
-            <input type="text" class="choiceB" placeholder="空欄②の語句" value="藤原氏">
-          </div>
-        </div>
-        <div class="choice-row" data-symbol="イ">
-          <div class="choice-row__symbol">イ</div>
-          <div class="choice-row__inputs">
-            <input type="text" class="choiceA" placeholder="空欄①の語句" value="古今和歌集">
-            <input type="text" class="choiceB" placeholder="空欄②の語句" value="細川氏">
-          </div>
-        </div>
-        <div class="choice-row" data-symbol="ウ">
-          <div class="choice-row__symbol">ウ</div>
-          <div class="choice-row__inputs">
-            <input type="text" class="choiceA" placeholder="空欄①の語句" value="万葉集">
-            <input type="text" class="choiceB" placeholder="空欄②の語句" value="藤原氏">
-          </div>
-        </div>
-        <div class="choice-row" data-symbol="エ">
-          <div class="choice-row__symbol">エ</div>
-          <div class="choice-row__inputs">
-            <input type="text" class="choiceA" placeholder="空欄①の語句" value="万葉集">
-            <input type="text" class="choiceB" placeholder="空欄②の語句" value="細川氏">
-          </div>
-        </div>
-      </div>
-
-      <div class="field-group" id="orderSection">
-        <h2><span class="field-group__index">05</span>並び替える項目</h2>
-        <p class="field-group__hint">使う分だけ入力してください。空欄の項目は書き出し時に表示されません。</p>
-
-        <div class="order-row" data-symbol="ア">
-          <div class="order-row__symbol">ア</div>
-          <textarea class="orderItem" rows="2" placeholder="出来事や文を入力">天正遣欧使節が派遣された。</textarea>
-        </div>
-        <div class="order-row" data-symbol="イ">
-          <div class="order-row__symbol">イ</div>
-          <textarea class="orderItem" rows="2" placeholder="出来事や文を入力">ザビエルが鹿児島に上陸した。</textarea>
-        </div>
-        <div class="order-row" data-symbol="ウ">
-          <div class="order-row__symbol">ウ</div>
-          <textarea class="orderItem" rows="2" placeholder="出来事や文を入力">ルターが宗教改革を始めた。</textarea>
-        </div>
-        <div class="order-row" data-symbol="エ">
-          <div class="order-row__symbol">エ</div>
-          <textarea class="orderItem" rows="2" placeholder="出来事や文を入力（空欄可）"></textarea>
-        </div>
-        <div class="order-row" data-symbol="オ">
-          <div class="order-row__symbol">オ</div>
-          <textarea class="orderItem" rows="2" placeholder="出来事や文を入力（空欄可）"></textarea>
-        </div>
-        <div class="order-row" data-symbol="カ">
-          <div class="order-row__symbol">カ</div>
-          <textarea class="orderItem" rows="2" placeholder="出来事や文を入力（空欄可）"></textarea>
-        </div>
-      </div>
-
-      <div class="field-group">
-        <h2><span class="field-group__index">06</span>フォント設定</h2>
-        <div class="row row--two">
-          <label class="field">
-            <span>資料・本文のフォント</span>
-            <select id="fontBody">
-              <option value="mincho" selected>BIZ UDMincho（明朝）</option>
-              <option value="gothic">BIZ UDGothic（ゴシック）</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>設問文・選択肢のフォント</span>
-            <select id="fontUI">
-              <option value="mincho" selected>BIZ UDMincho（明朝）</option>
-              <option value="gothic">BIZ UDGothic（ゴシック）</option>
-            </select>
-          </label>
-        </div>
-        <div class="row row--two">
-          <label class="field">
-            <span>用紙の幅</span>
-            <select id="paperWidth">
-              <option value="820">やや狭い（820px）</option>
-              <option value="900" selected>標準（900px）</option>
-              <option value="980">やや広い（980px）</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>文字サイズ</span>
-            <input type="range" id="fontSize" min="14" max="20" value="16">
-          </label>
-        </div>
-        <div class="row row--two">
-          <label class="field">
-            <span>用紙の余白</span>
-            <input type="range" id="paperPadding" min="12" max="60" value="40">
-          </label>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ===== Preview (right) ===== -->
-    <section class="preview" aria-label="プレビューと書き出し">
-
-      <div class="preview__stage">
-        <div class="paper" id="capture-area">
-          <div class="paper__content" id="paperContent">
-
-            <p class="q-instruction" id="prevInstruction"></p>
-
-            <div class="resource-wrap" id="resourceWrap">
-              <div class="resource-box__title-outer" id="prevTitle"></div>
-              <div class="resource-box" id="resourceBox">
-                <p class="resource-box__body" id="prevBody"></p>
-              </div>
-            </div>
-
-            <div class="choices-grid" id="prevChoices"></div>
-
-            <div class="order-list" id="prevOrderItems"></div>
-
-          </div>
-        </div>
-      </div>
-
-      <div class="preview__actions">
-        <div class="export-options">
-          <label class="field">
-            <span>書き出し形式</span>
-            <select id="exportFormat">
-              <option value="png" selected>PNG画像（高画質）</option>
-              <option value="svg">SVG（ベクター・文字埋め込み）</option>
-              <option value="pdf">PDF</option>
-            </select>
-          </label>
-          <label class="field" id="scaleField">
-            <span>解像度倍率</span>
-            <select id="exportScale">
-              <option value="2">2倍</option>
-              <option value="3" selected>3倍（推奨）</option>
-              <option value="4">4倍（大きめ）</option>
-            </select>
-          </label>
-        </div>
-        <p class="export-note" id="svgNote" style="display:none;">※ SVGはブラウザの仕様上、まれにフォントが正しく反映されないことがあります。安定して同じ見た目で書き出したい場合はPNGをおすすめします。</p>
-
-        <button id="downloadBtn" class="stamp-btn" type="button">
-          <span class="stamp-btn__ring"></span>
-          <span class="stamp-btn__label">書き<br>出し</span>
-        </button>
-        <p class="preview__note" id="statusNote">フォントの読み込みが完了すると、正確なプレビューが表示されます。</p>
-      </div>
-
-    </section>
-
+    <div id="editor-list"></div>
   </div>
 
-  <footer class="app-footer">
-    <p>フォント：BIZ UDGothic / BIZ UDMincho（Google Fonts）　-　書き出し：html2canvas（PNG/PDF）／html-to-image（SVG）／jsPDF　-　入力内容はブラウザ内でのみ処理され、サーバーには送信されません。</p>
-  </footer>
+  <!-- ============ プレビュー ============ -->
+  <div class="preview-panel">
+    <div class="export-bar">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn primary" id="export-png-btn">画像として書き出す (PNG)</button>
+        <button class="btn primary" id="export-pdf-btn">PDFとして書き出す</button>
+        <button class="btn light" id="print-btn">印刷してPDF保存</button>
+      </div>
+      <div class="export-note">※「印刷してPDF保存」はブラウザの印刷ダイアログでページ区切りがきれいに入ります。</div>
+    </div>
+
+    <div class="sheet-scroll">
+      <div class="sheet" id="preview-sheet">
+        <!-- JSで動的に生成 -->
+      </div>
+    </div>
+  </div>
 
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
