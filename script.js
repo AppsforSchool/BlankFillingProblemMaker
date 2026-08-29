@@ -137,24 +137,9 @@ editorList.addEventListener('click', (e) => {
 /* ===================== プレビュー描画 ===================== */
 function renderPreview(){
   const sheet = document.getElementById('preview-sheet');
-  const kind = document.getElementById('cover-kind').value;
-  const title = document.getElementById('cover-title').value;
-  const sub = document.getElementById('cover-sub').value;
-  const noticeText = document.getElementById('notice-text').value;
   const showAnswerKey = document.getElementById('toggle-answerkey').checked;
 
-  let html = `
-    <div class="cover">
-      <div class="kind">${escapeHtml(kind)}</div>
-      <h1>${escapeHtml(title)}</h1>
-      ${sub ? `<div class="sub">${escapeHtml(sub)}</div>` : ''}
-    </div>
-    ${noticeText.trim() ? `
-    <div class="notice">
-      <div class="notice-title">注　意</div>
-      ${escapeHtml(noticeText).split('\n').filter(l=>l.trim()).map((l,i)=>`${i+1}　${l}`).join('<br>')}
-    </div>` : ''}
-  `;
+  let html = "";
 
   if(questions.length === 0){
     html += `<div class="empty-msg">問題がまだありません。左のパネルから追加してください。</div>`;
@@ -209,17 +194,13 @@ document.getElementById('clear-all-btn').addEventListener('click', () => {
   renderPreview();
 });
 
-document.querySelectorAll('.cover-fields input, .cover-fields textarea, #toggle-answerkey')
+document.querySelectorAll('.cover-fields input, #toggle-answerkey')
   .forEach(el => el.addEventListener('input', renderPreview));
 
 /* ---- JSON 保存・読み込み ---- */
 document.getElementById('save-json-btn').addEventListener('click', () => {
   const data = {
-    cover:{
-      kind: document.getElementById('cover-kind').value,
-      title: document.getElementById('cover-title').value,
-      sub: document.getElementById('cover-sub').value,
-      notice: document.getElementById('notice-text').value,
+    options:{
       showAnswerKey: document.getElementById('toggle-answerkey').checked
     },
     questions
@@ -241,13 +222,8 @@ document.getElementById('json-file-input').addEventListener('change', (e) => {
   reader.onload = () => {
     try{
       const data = JSON.parse(reader.result);
-      if(data.cover){
-        document.getElementById('cover-kind').value = data.cover.kind || "";
-        document.getElementById('cover-title').value = data.cover.title || "";
-        document.getElementById('cover-sub').value = data.cover.sub || "";
-        document.getElementById('notice-text').value = data.cover.notice || "";
-        document.getElementById('toggle-answerkey').checked = !!data.cover.showAnswerKey;
-      }
+      const opts = data.options || data.cover || {}; // 旧形式(cover)のJSONとの互換性を維持
+      document.getElementById('toggle-answerkey').checked = !!opts.showAnswerKey;
       questions = (data.questions || []).map(q => newQuestion(q));
       renderEditor();
       renderPreview();
