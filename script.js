@@ -1,277 +1,696 @@
-/* ===================== 状態管理 ===================== */
-let questions = []; // {id, subject, passage, choices:[4], correct(0-3)}
-let uidSeed = 1;
+/* ============================================================
+   入試問題ジェネレーター - script.js
+   全てクライアントサイドで完結（サーバー送信なし）
+   ============================================================ */
 
-function newQuestion(overrides={}){
-  return Object.assign({
-    id: uidSeed++,
-    subject: "",
-    passage: "次の文中の{a}，{b}に当てはまる言葉の正しい組み合わせを、ア～エから一つ選び、符号で書きなさい。\n\n",
-    choices: ["", "", "", ""],
-    correct: 0
-  }, overrides);
-}
+(function () {
+  'use strict';
 
-/* ===================== サンプルデータ ===================== */
-const SAMPLE_QUESTIONS = [
-  {subject:"歴史", passage:"奈良時代、人口増加による口分田の不足に対応するため、743年、朝廷は新しく開墾した土地の永久私有を認める{a}を出した。これにより、貴族や寺社による{b}が進み、公地公民の原則がくずれ始めた。",
-   choices:["墾田永年私財法／私有地の拡大（荘園の形成）","墾田永年私財法／土地の国有化","三世一身法／私有地の拡大（荘園の形成）","三世一身法／土地の国有化"], correct:0},
-  {subject:"歴史", passage:"1221年、後鳥羽上皇が鎌倉幕府打倒を目指して兵をあげたが敗れた。この争いを{a}という。幕府はこの後、京都に{b}を置いて朝廷を監視するとともに、西国の武士の統率にあたらせた。",
-   choices:["承久の乱／六波羅探題","承久の乱／鎌倉府","応仁の乱／六波羅探題","応仁の乱／鎌倉府"], correct:0},
-  {subject:"歴史", passage:"18世紀後半、老中の田沼意次は、商工業者の同業者組織である株仲間の結成を{a}し、営業税を徴収することで幕府の財政を立て直そうとした。しかし、あとを継いだ老中松平定信は、質素・倹約を奨励する{b}と呼ばれる改革を行った。",
-   choices:["奨励／寛政の改革","奨励／天保の改革","禁止／寛政の改革","禁止／天保の改革"], correct:0},
-  {subject:"地理", passage:"乾燥帯のうち、年間を通じてほとんど雨が降らない気候を{a}といい、わずかながら雨季があり丈の短い草原が広がる気候を{b}という。",
-   choices:["砂漠気候／ステップ気候","砂漠気候／温帯冬季少雨気候","サバナ気候／ステップ気候","サバナ気候／温帯冬季少雨気候"], correct:0},
-  {subject:"地理", passage:"本州中央部を南北に走る溝状の地形を{a}といい、その西の縁にあたる糸魚川・静岡構造線を境に、東日本と西日本では山地の走る方向が大きく異なる。また、九州から関東地方まで日本列島を東西に横断する断層帯を{b}という。",
-   choices:["フォッサマグナ／中央構造線","フォッサマグナ／環太平洋造山帯","リアス海岸／中央構造線","リアス海岸／環太平洋造山帯"], correct:0},
-  {subject:"地理", passage:"高度経済成長期以降、大都市では都心部の人口が減り、郊外の人口が増える{a}現象が見られたが、近年は大都市の再開発が進み、都心部の人口が再び増える{b}現象も見られるようになった。",
-   choices:["ドーナツ化／都心回帰","ドーナツ化／地方創生","過疎化／都心回帰","過疎化／地方創生"], correct:0}
-];
+  const container = document.getElementById('pages-container');
+  const exportStage = document.getElementById('export-stage');
+  const imageFileInput = document.getElementById('image-file-input');
+  const loadJsonInput = document.getElementById('load-json-input');
+  const zoomLevelLabel = document.getElementById('zoom-level');
 
-/* ===================== ユーティリティ ===================== */
-function escapeHtml(str){
-  return (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-}
-function formatPassage(str){
-  const escaped = escapeHtml(str).replace(/\n/g, "<br>");
-  return escaped.replace(/\{([a-zA-Zａ-ｚＡ-Ｚ])\}/g, (m, letter) => `<span class="blank">${letter}</span>`);
-}
-const KIGO = ["ア","イ","ウ","エ"];
+  let zoom = 1;
+  let activePage = null;          // last page the user interacted with
+  let pendingImageTarget = null;  // context captured before opening the file picker
 
-// 選択肢のいずれかが長い場合、実際の入試同様、2列ではなく1列（縦積み）で表示する
-function isLongChoiceSet(choices){
-  const LONG_THRESHOLD = 20; // 全角換算の目安文字数
-  return choices.some(c => (c || "").length > LONG_THRESHOLD);
-}
-
-/* ===================== エディタ描画 ===================== */
-const editorList = document.getElementById('editor-list');
-
-function renderEditor(){
-  editorList.innerHTML = "";
-  if(questions.length === 0){
-    editorList.innerHTML = '<div class="empty-msg" style="padding:20px 0;">「＋ 問題を追加」または「サンプルを読み込む」から始めてください。</div>';
-    return;
+  /* ------------------------------------------------------------
+     Small helpers
+  ------------------------------------------------------------ */
+  function el(html) {
+    const t = document.createElement('template');
+    t.innerHTML = html.trim();
+    return t.content.firstElementChild;
   }
-  questions.forEach((q, idx) => {
-    const card = document.createElement('div');
-    card.className = 'edit-card';
-    card.dataset.id = q.id;
-    card.innerHTML = `
-      <div class="edit-card-head">
-        <span class="qidx">問${idx+1}</span>
-        <input type="text" class="subject-input" placeholder="教科ラベル（例: 歴史）" value="${escapeHtml(q.subject)}">
-        <button class="mini-btn" data-act="up">↑</button>
-        <button class="mini-btn" data-act="down">↓</button>
-        <button class="mini-btn" data-act="dup">複製</button>
-        <button class="mini-btn danger" data-act="del">削除</button>
-      </div>
-      <label class="field-label">問題文（空所は {a} {b} のように書くと四角囲みの空欄になります）</label>
-      <textarea class="passage-input" data-act="passage" rows="4">${escapeHtml(q.passage)}</textarea>
-      <label class="field-label">選択肢</label>
-      <div class="choice-grid">
-        ${[0,1,2,3].map(i => `
-          <div class="choice-row">
-            <span class="kigo">${KIGO[i]}</span>
-            <input type="text" data-act="choice" data-idx="${i}" value="${escapeHtml(q.choices[i])}">
-          </div>`).join('')}
-      </div>
-      <div class="correct-row">
-        正解（解答一覧用・任意）:
-        <select data-act="correct">
-          ${[0,1,2,3].map(i => `<option value="${i}" ${q.correct===i?'selected':''}>${KIGO[i]}</option>`).join('')}
-        </select>
-      </div>
-    `;
-    editorList.appendChild(card);
+
+  function toCircled(n) {
+    if (n >= 1 && n <= 20) return String.fromCodePoint(0x2460 + n - 1);
+    if (n >= 21 && n <= 35) return String.fromCodePoint(0x3251 + n - 21);
+    return '(' + n + ')';
+  }
+
+  const KANA = ['ア', 'イ', 'ウ', 'エ', 'オ', 'カ', 'キ', 'ク', 'ケ', 'コ'];
+
+  function closestInPage(node, selector) {
+    if (!node) return null;
+    const elNode = node.nodeType === 3 ? node.parentElement : node;
+    if (!elNode || !elNode.closest) return null;
+    return elNode.closest(selector);
+  }
+
+  function isInsidePage(node) {
+    return !!closestInPage(node, '.page');
+  }
+
+  function placeCaretAfter(node) {
+    const range = document.createRange();
+    range.setStartAfter(node);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  function focusEl(node) {
+    if (!node) return;
+    node.focus();
+    // place caret at end
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  /* ------------------------------------------------------------
+     Context detection (which page / qblock / subq the user is in)
+  ------------------------------------------------------------ */
+  function getContext() {
+    let activeElement = document.activeElement;
+    let page = closestInPage(activeElement, '.page');
+    if (!page) page = activePage;
+    if (!page || !document.body.contains(page)) return { page: null };
+
+    const qblockRaw = closestInPage(activeElement, '.qblock');
+    const qblock = qblockRaw && page.contains(qblockRaw) ? qblockRaw : null;
+    const qbody = qblock ? qblock.querySelector(':scope > .qbody') : null;
+    const qsubs = qbody ? qbody.querySelector(':scope > .qsubs') : null;
+
+    const subqRaw = closestInPage(activeElement, '.subq');
+    const subq = subqRaw && page.contains(subqRaw) ? subqRaw : null;
+
+    return { page, qblock, qbody, qsubs, subq };
+  }
+
+  /* ------------------------------------------------------------
+     Block control bar (↑ ↓ × and type-specific buttons)
+  ------------------------------------------------------------ */
+  function controlsHtml(type) {
+    let extra = '';
+    if (type === 'choices') extra = '<button data-act="add-choice" title="選択肢を追加">＋</button>';
+    if (type === 'refbox') extra = '<button data-act="toggle-float" title="配置切替（全幅／右寄せ）">⇔</button>';
+    if (type === 'infobox-grid') extra = '<button data-act="add-box" title="ボックスを追加">□＋</button>';
+    return (
+      '<div class="block-controls" contenteditable="false">' +
+      '<button data-act="up" title="上へ">↑</button>' +
+      '<button data-act="down" title="下へ">↓</button>' +
+      extra +
+      '<button data-act="del" title="削除">×</button>' +
+      '</div>'
+    );
+  }
+
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.block-controls button');
+    if (!btn) return;
+    e.preventDefault();
+    const block = btn.closest('.block');
+    if (!block) return;
+    const act = btn.dataset.act;
+    if (act === 'up') {
+      const prev = block.previousElementSibling;
+      if (prev) block.parentNode.insertBefore(block, prev);
+    } else if (act === 'down') {
+      const next = block.nextElementSibling;
+      if (next) block.parentNode.insertBefore(next, block);
+    } else if (act === 'del') {
+      if (confirm('この部品を削除しますか？')) block.remove();
+    } else if (act === 'add-choice') {
+      addChoiceItem(block);
+    } else if (act === 'toggle-float') {
+      block.classList.toggle('ref-right');
+    } else if (act === 'add-box') {
+      const box = block.querySelector('.infobox');
+      const clone = box.cloneNode(true);
+      clone.querySelectorAll('[contenteditable]').forEach((n) => {
+        if (n.classList.contains('infobox-title')) n.textContent = '見出し';
+        if (n.classList.contains('infobox-body')) n.textContent = '本文を入力してください。';
+      });
+      block.appendChild(clone);
+    }
+    scheduleOverflowCheck();
   });
-}
 
-function findQuestion(id){
-  return questions.find(q => q.id === Number(id));
-}
-
-editorList.addEventListener('input', (e) => {
-  const card = e.target.closest('.edit-card');
-  if(!card) return;
-  const q = findQuestion(card.dataset.id);
-  if(!q) return;
-  const act = e.target.dataset.act;
-
-  if(e.target.classList.contains('subject-input')){
-    q.subject = e.target.value;
-  } else if(act === 'passage'){
-    q.passage = e.target.value;
-  } else if(act === 'choice'){
-    q.choices[Number(e.target.dataset.idx)] = e.target.value;
-  } else if(act === 'correct'){
-    q.correct = Number(e.target.value);
+  function addChoiceItem(choicesBlock) {
+    const items = choicesBlock.querySelectorAll('.choice-item');
+    const idx = items.length;
+    const item = el(
+      '<span class="choice-item"><span class="kana" contenteditable="false">' +
+        (KANA[idx] || '?') +
+        '</span><span class="choice-text" contenteditable="true">選択肢' + (idx + 1) + '</span></span>'
+    );
+    choicesBlock.appendChild(item);
   }
-  renderPreview();
-});
 
-editorList.addEventListener('click', (e) => {
-  const btn = e.target.closest('.mini-btn');
-  if(!btn) return;
-  const card = e.target.closest('.edit-card');
-  const id = Number(card.dataset.id);
-  const idx = questions.findIndex(q => q.id === id);
-  if(idx === -1) return;
-
-  const act = btn.dataset.act;
-  if(act === 'del'){
-    questions.splice(idx, 1);
-  } else if(act === 'up' && idx > 0){
-    [questions[idx-1], questions[idx]] = [questions[idx], questions[idx-1]];
-  } else if(act === 'down' && idx < questions.length-1){
-    [questions[idx+1], questions[idx]] = [questions[idx], questions[idx+1]];
-  } else if(act === 'dup'){
-    const copy = JSON.parse(JSON.stringify(questions[idx]));
-    copy.id = uidSeed++;
-    questions.splice(idx+1, 0, copy);
+  /* ------------------------------------------------------------
+     Templates
+  ------------------------------------------------------------ */
+  function buildQuestionPage(pageNumber) {
+    return el(
+      '<div class="page-frame"><div class="page page-type-question">' +
+        '<div class="page-inner"></div>' +
+        '<div class="page-number" contenteditable="true">－' + pageNumber + '－</div>' +
+        '<div class="page-code" contenteditable="true">◇◇◇（000－00）</div>' +
+      '</div></div>'
+    );
   }
-  renderEditor();
-  renderPreview();
-});
 
-/* ===================== プレビュー描画 ===================== */
-function renderPreview(){
-  const sheet = document.getElementById('preview-sheet');
-  const showAnswerKey = document.getElementById('toggle-answerkey').checked;
+  function buildCoverPage() {
+    return el(
+      '<div class="page-frame"><div class="page page-type-cover">' +
+        '<div class="cover-page">' +
+          '<div class="cover-year" contenteditable="true">令和　　年度</div>' +
+          '<div class="cover-titles">' +
+            '<div class="cover-kind" contenteditable="true">学　力　検　査</div>' +
+            '<div class="cover-subject" contenteditable="true">教　科　名</div>' +
+          '</div>' +
+          '<div class="cover-notes-title" contenteditable="true">注　　意</div>' +
+          '<div class="cover-notes-box" contenteditable="true">' +
+            '<ol>' +
+              '<li>指示があるまでは、この冊子を開いてはいけません。</li>' +
+              '<li>解答用紙は、この冊子の中に、はさんであります。</li>' +
+              '<li>答えは、全て解答用紙に記入しなさい。</li>' +
+              '<li>検査問題は　ページで、問題は　１　から　　まであります。</li>' +
+            '</ol>' +
+          '</div>' +
+        '</div>' +
+        '<div class="page-code" contenteditable="true">◇◇◇（000－00）</div>' +
+      '</div></div>'
+    );
+  }
 
-  let html = "";
+  function buildDividerPage() {
+    return el(
+      '<div class="page-frame"><div class="page page-type-divider">' +
+        '<div class="cover-page">' +
+          '<div class="cover-year" contenteditable="true">令和　　年度</div>' +
+          '<div class="cover-titles">' +
+            '<div class="cover-kind" contenteditable="true">検　査　問　題</div>' +
+            '<div class="cover-subject" contenteditable="true">教　科　名</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="page-code" contenteditable="true">◇◇◇（000－00）</div>' +
+      '</div></div>'
+    );
+  }
 
-  if(questions.length === 0){
-    html += `<div class="empty-msg">問題がまだありません。左のパネルから追加してください。</div>`;
-  } else {
-    questions.forEach((q, idx) => {
-      html += `
-        <div class="q-block">
-          <div class="q-head">
-            <span class="q-num">${idx+1}</span>
-          </div>
-          <div class="q-passage">${formatPassage(q.passage)}</div>
-          <ul class="choices${isLongChoiceSet(q.choices) ? ' single-col' : ''}">
-            ${q.choices.map((c,i) => `<li><span class="kigo">${KIGO[i]}</span><span>${escapeHtml(c)}</span></li>`).join('')}
-          </ul>
-        </div>
-      `;
+  function buildDaimon(num) {
+    return el(
+      '<div class="block qblock" data-block="qblock">' +
+        controlsHtml('qblock') +
+        '<div class="qnum-box" contenteditable="true">' + num + '</div>' +
+        '<div class="qbody">' +
+          '<div class="qlead" contenteditable="true">（ここに大問のリード文を入力してください。）</div>' +
+          '<div class="qsubs"></div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function buildBox(cols) {
+    const box =
+      '<div class="infobox">' +
+        '<div class="infobox-title" contenteditable="true">見出し</div>' +
+        '<div class="infobox-body" contenteditable="true">本文を入力してください。</div>' +
+      '</div>';
+    if (cols === 2) {
+      return el(
+        '<div class="block infobox-grid" data-block="infobox-grid">' +
+          controlsHtml('infobox-grid') + box + box +
+        '</div>'
+      );
+    }
+    return el(
+      '<div class="block infobox-single" data-block="infobox-single">' +
+        controlsHtml('infobox-single') + box +
+      '</div>'
+    );
+  }
+
+  function buildSubq(num) {
+    return el(
+      '<div class="block subq" data-block="subq">' +
+        controlsHtml('subq') +
+        '<span class="subq-label" contenteditable="true">' + num + '</span>' +
+        '<span class="subq-prompt" contenteditable="true">　設問文を入力してください。［［Ⅰ］］のように二重角括弧で空欄になります。</span>' +
+      '</div>'
+    );
+  }
+
+  function buildChoices() {
+    const items = [0, 1, 2, 3]
+      .map(
+        (i) =>
+          '<span class="choice-item"><span class="kana" contenteditable="false">' +
+          KANA[i] +
+          '</span><span class="choice-text" contenteditable="true">選択肢' + (i + 1) + '</span></span>'
+      )
+      .join('');
+    return el(
+      '<div class="block choices choices-block" data-block="choices">' +
+        controlsHtml('choices') + items +
+      '</div>'
+    );
+  }
+
+  function buildRefBox() {
+    return el(
+      '<div class="block ref-box" data-block="refbox">' +
+        controlsHtml('refbox') +
+        '<div class="ref-title" contenteditable="true">［資料］</div>' +
+        '<div class="ref-body" contenteditable="true">資料の内容を入力してください。</div>' +
+      '</div>'
+    );
+  }
+
+  function buildFreeImage(dataUrl) {
+    return el(
+      '<div class="block free-image" data-block="free-image" style="width:55mm;height:38mm;">' +
+        controlsHtml('free-image') +
+        '<img src="' + dataUrl + '" contenteditable="false">' +
+      '</div>'
+    );
+  }
+
+  /* ------------------------------------------------------------
+     Inline markup post-processing (turn [[ ]] typed as plain text
+     is NOT auto-converted; instead we insert the .blank span
+     directly via the toolbar. The following converts double-bracket
+     text typed manually, as a convenience, on blur.)
+  ------------------------------------------------------------ */
+  function autoConvertBlanksIn(node) {
+    if (!node) return;
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null);
+    const targets = [];
+    let n;
+    while ((n = walker.nextNode())) {
+      if (/\[\[.*?\]\]/.test(n.nodeValue)) targets.push(n);
+    }
+    targets.forEach((textNode) => {
+      const parts = textNode.nodeValue.split(/(\[\[.*?\]\])/g);
+      if (parts.length <= 1) return;
+      const frag = document.createDocumentFragment();
+      parts.forEach((p) => {
+        const m = p.match(/^\[\[(.*?)\]\]$/);
+        if (m) {
+          const span = document.createElement('span');
+          span.className = 'blank';
+          span.contentEditable = 'true';
+          span.textContent = m[1] || '\u3000';
+          frag.appendChild(span);
+        } else if (p) {
+          frag.appendChild(document.createTextNode(p));
+        }
+      });
+      textNode.parentNode.replaceChild(frag, textNode);
     });
-
-    if(showAnswerKey){
-      html += `
-        <div class="answerkey">
-          <h3>解答</h3>
-          <table><tbody>
-            <tr>${questions.map((q,idx) => `<td class="head">問${idx+1}</td>`).join('')}</tr>
-            <tr>${questions.map(q => `<td>${KIGO[q.correct]}</td>`).join('')}</tr>
-          </tbody></table>
-        </div>
-      `;
-    }
   }
 
-  sheet.innerHTML = html;
-}
-
-/* ===================== ボタン類 ===================== */
-document.getElementById('add-question-btn').addEventListener('click', () => {
-  questions.push(newQuestion());
-  renderEditor();
-  renderPreview();
-});
-
-document.getElementById('load-sample-btn').addEventListener('click', () => {
-  SAMPLE_QUESTIONS.forEach(s => questions.push(newQuestion(s)));
-  renderEditor();
-  renderPreview();
-});
-
-document.getElementById('clear-all-btn').addEventListener('click', () => {
-  if(questions.length && !confirm('全ての問題を削除します。よろしいですか？')) return;
-  questions = [];
-  renderEditor();
-  renderPreview();
-});
-
-document.querySelectorAll('.cover-fields input, #toggle-answerkey')
-  .forEach(el => el.addEventListener('input', renderPreview));
-
-/* ---- JSON 保存・読み込み ---- */
-document.getElementById('save-json-btn').addEventListener('click', () => {
-  const data = {
-    options:{
-      showAnswerKey: document.getElementById('toggle-answerkey').checked
+  container.addEventListener(
+    'blur',
+    function (e) {
+      const t = e.target;
+      if (t && t.isContentEditable) autoConvertBlanksIn(t);
     },
-    questions
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'social_exam_data.json';
-  a.click();
-});
+    true
+  );
 
-document.getElementById('load-json-btn').addEventListener('click', () => {
-  document.getElementById('json-file-input').click();
-});
-document.getElementById('json-file-input').addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    try{
-      const data = JSON.parse(reader.result);
-      const opts = data.options || data.cover || {}; // 旧形式(cover)のJSONとの互換性を維持
-      document.getElementById('toggle-answerkey').checked = !!opts.showAnswerKey;
-      questions = (data.questions || []).map(q => newQuestion(q));
-      renderEditor();
-      renderPreview();
-    }catch(err){
-      alert('JSONの読み込みに失敗しました: ' + err.message);
-    }
-  };
-  reader.readAsText(file);
-  e.target.value = "";
-});
-
-/* ---- 書き出し ---- */
-document.getElementById('export-png-btn').addEventListener('click', async () => {
-  const sheet = document.getElementById('preview-sheet');
-  const canvas = await html2canvas(sheet, {scale:2, backgroundColor:'#fbf9f4'});
-  const a = document.createElement('a');
-  a.download = 'social_exam.png';
-  a.href = canvas.toDataURL('image/png');
-  a.click();
-});
-
-document.getElementById('export-pdf-btn').addEventListener('click', async () => {
-  const sheet = document.getElementById('preview-sheet');
-  const canvas = await html2canvas(sheet, {scale:2, backgroundColor:'#fbf9f4'});
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF('p', 'pt', 'a4');
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const imgWidth = pageWidth;
-  const imgHeight = canvas.height * imgWidth / canvas.width;
-  const imgData = canvas.toDataURL('image/png');
-
-  let heightLeft = imgHeight;
-  let position = 0;
-  pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-  heightLeft -= pageHeight;
-  while(heightLeft > 0){
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
+  /* ------------------------------------------------------------
+     Toolbar actions
+  ------------------------------------------------------------ */
+  function alertCtx(msg) {
+    alert(msg);
   }
-  pdf.save('social_exam.pdf');
-});
 
-document.getElementById('print-btn').addEventListener('click', () => window.print());
+  const actions = {
+    'add-question-page': function () {
+      const count = document.querySelectorAll('.page-type-question').length + 1;
+      const frame = buildQuestionPage(count);
+      container.appendChild(frame);
+      activePage = frame.querySelector('.page');
+      scheduleOverflowCheck();
+    },
+    'add-cover-page': function () {
+      const frame = buildCoverPage();
+      container.appendChild(frame);
+      activePage = frame.querySelector('.page');
+    },
+    'add-divider-page': function () {
+      const frame = buildDividerPage();
+      container.appendChild(frame);
+      activePage = frame.querySelector('.page');
+    },
+    'insert-daimon': function () {
+      const ctx = getContext();
+      if (!ctx.page) return alertCtx('先に「＋問題ページ」でページを追加し、その中をクリックしてください。');
+      const pageInner = ctx.page.querySelector('.page-inner');
+      if (!pageInner) return alertCtx('この種類のページには大問を追加できません。問題ページを選んでください。');
+      const num = document.querySelectorAll('.qnum-box').length + 1;
+      const node = buildDaimon(num);
+      if (ctx.qblock) ctx.qblock.after(node);
+      else pageInner.appendChild(node);
+      focusEl(node.querySelector('.qlead'));
+      scheduleOverflowCheck();
+    },
+    'insert-box2': function () { insertBox(2); },
+    'insert-box1': function () { insertBox(1); },
+    'insert-subq': function () {
+      const ctx = getContext();
+      if (!ctx.qsubs) return alertCtx('先に大問枠の中をクリックしてください（大問枠がない場合は「大問枠」を追加してください）。');
+      const num = ctx.qsubs.querySelectorAll(':scope > .subq').length + 1;
+      const node = buildSubq(num);
+      if (ctx.subq && ctx.qsubs.contains(ctx.subq)) ctx.subq.after(node);
+      else ctx.qsubs.appendChild(node);
+      focusEl(node.querySelector('.subq-prompt'));
+      scheduleOverflowCheck();
+    },
+    'insert-choices': function () {
+      const ctx = getContext();
+      const target = ctx.subq || ctx.qbody;
+      if (!target) return alertCtx('先に設問（または大問）の中をクリックしてください。');
+      const node = buildChoices();
+      target.appendChild(node);
+      scheduleOverflowCheck();
+    },
+    'insert-refbox': function () {
+      const ctx = getContext();
+      const target = ctx.subq || ctx.qbody;
+      if (!target) return alertCtx('先に設問（または大問）の中をクリックしてください。');
+      const node = buildRefBox();
+      target.appendChild(node);
+      scheduleOverflowCheck();
+    },
+    'insert-blank': function () {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || !isInsidePage(sel.anchorNode)) {
+        return alertCtx('本文中の挿入したい位置をクリック（または語句を選択）してから押してください。');
+      }
+      const range = sel.getRangeAt(0);
+      let text = '\u3000';
+      if (!sel.isCollapsed) {
+        text = range.toString();
+        range.deleteContents();
+      }
+      const span = document.createElement('span');
+      span.className = 'blank';
+      span.contentEditable = 'true';
+      span.textContent = text;
+      range.insertNode(span);
+      placeCaretAfter(span);
+      scheduleOverflowCheck();
+    },
+    'insert-underline': function () {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed || !isInsidePage(sel.anchorNode)) {
+        return alertCtx('下線を引きたい語句を選択してから押してください。');
+      }
+      const range = sel.getRangeAt(0);
+      const suggestion = document.querySelectorAll('.circ').length + 1;
+      const input = prompt('丸数字の番号を入力してください', String(suggestion));
+      if (input === null) return;
+      const n = parseInt(input, 10);
+      if (!n || n < 1) return;
+      const text = range.toString();
+      range.deleteContents();
+      const circ = document.createElement('span');
+      circ.className = 'circ';
+      circ.contentEditable = 'false';
+      circ.textContent = toCircled(n);
+      const ul = document.createElement('span');
+      ul.className = 'ul';
+      ul.contentEditable = 'true';
+      ul.textContent = text;
+      const frag = document.createDocumentFragment();
+      frag.appendChild(circ);
+      frag.appendChild(ul);
+      range.insertNode(frag);
+      placeCaretAfter(ul);
+      scheduleOverflowCheck();
+    },
+    'insert-bold': function () {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed || !isInsidePage(sel.anchorNode)) {
+        return alertCtx('太字にしたい語句を選択してから押してください。');
+      }
+      const range = sel.getRangeAt(0);
+      const b = document.createElement('b');
+      try {
+        range.surroundContents(b);
+      } catch (err) {
+        const text = range.toString();
+        range.deleteContents();
+        b.textContent = text;
+        range.insertNode(b);
+      }
+      placeCaretAfter(b);
+    },
+    'insert-image': function () {
+      pendingImageTarget = getContext();
+      pendingImageTarget.activeElement = document.activeElement;
+      imageFileInput.value = '';
+      imageFileInput.click();
+    },
+  };
 
-/* ===================== 初期化 ===================== */
-SAMPLE_QUESTIONS.slice(0,3).forEach(s => questions.push(newQuestion(s)));
-renderEditor();
-renderPreview();
+  function insertBox(cols) {
+    const ctx = getContext();
+    if (!ctx.qbody) return alertCtx('先に大問枠の中をクリックしてください（大問枠がない場合は「大問枠」を追加してください）。');
+    const node = buildBox(cols);
+    const qsubs = ctx.qbody.querySelector(':scope > .qsubs');
+    if (qsubs) ctx.qbody.insertBefore(node, qsubs);
+    else ctx.qbody.appendChild(node);
+    scheduleOverflowCheck();
+  }
+
+  imageFileInput.addEventListener('change', function () {
+    const file = imageFileInput.files && imageFileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function () {
+      const dataUrl = reader.result;
+      const activeEl = pendingImageTarget && pendingImageTarget.activeElement;
+      if (
+        activeEl &&
+        activeEl.isContentEditable &&
+        (activeEl.classList.contains('ref-body') ||
+          activeEl.classList.contains('infobox-body') ||
+          activeEl.classList.contains('qlead'))
+      ) {
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.style.maxWidth = '100%';
+        activeEl.appendChild(document.createElement('br'));
+        activeEl.appendChild(img);
+      } else {
+        const ctx = pendingImageTarget || {};
+        const target = ctx.subq || ctx.qbody || (ctx.page && ctx.page.querySelector('.page-inner'));
+        if (!target) {
+          alertCtx('先にページ内をクリックしてから画像を挿入してください。');
+          return;
+        }
+        target.appendChild(buildFreeImage(dataUrl));
+      }
+      scheduleOverflowCheck();
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.querySelectorAll('#toolbar button[data-action]').forEach((btn) => {
+    // Prevent the button from stealing focus / collapsing the text selection
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const fn = actions[btn.dataset.action];
+      if (fn) fn();
+    });
+  });
+
+  /* ------------------------------------------------------------
+     Track which page the user last clicked in (for context)
+  ------------------------------------------------------------ */
+  container.addEventListener('click', function (e) {
+    const page = e.target.closest('.page');
+    if (page) activePage = page;
+  });
+
+  /* ------------------------------------------------------------
+     Zoom
+  ------------------------------------------------------------ */
+  function applyZoom() {
+    document.documentElement.style.setProperty('--scale', zoom.toFixed(2));
+    zoomLevelLabel.textContent = Math.round(zoom * 100) + '%';
+  }
+  document.querySelector('[data-action="zoom-in"]').addEventListener('click', () => {
+    zoom = Math.min(2, zoom + 0.1);
+    applyZoom();
+  });
+  document.querySelector('[data-action="zoom-out"]').addEventListener('click', () => {
+    zoom = Math.max(0.4, zoom - 0.1);
+    applyZoom();
+  });
+
+  /* ------------------------------------------------------------
+     Overflow warning
+  ------------------------------------------------------------ */
+  let overflowTimer = null;
+  function scheduleOverflowCheck() {
+    clearTimeout(overflowTimer);
+    overflowTimer = setTimeout(checkOverflow, 250);
+  }
+  function checkOverflow() {
+    document.querySelectorAll('.page').forEach((p) => {
+      const inner = p.querySelector('.page-inner');
+      if (!inner) {
+        p.classList.remove('overflow');
+        return;
+      }
+      const cs = getComputedStyle(p);
+      const avail = p.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 34; // leave room for footer
+      if (inner.scrollHeight > avail) p.classList.add('overflow');
+      else p.classList.remove('overflow');
+    });
+  }
+  container.addEventListener('input', scheduleOverflowCheck);
+  window.addEventListener('resize', scheduleOverflowCheck);
+
+  /* ------------------------------------------------------------
+     Help panel
+  ------------------------------------------------------------ */
+  document.getElementById('toggle-help').addEventListener('click', () => {
+    document.getElementById('help-panel').classList.add('show');
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target.dataset && e.target.dataset.action === 'close-help') {
+      document.getElementById('help-panel').classList.remove('show');
+    }
+  });
+
+  /* ------------------------------------------------------------
+     Save / Load project (JSON containing the raw markup)
+  ------------------------------------------------------------ */
+  document.querySelector('[data-action="save-json"]').addEventListener('click', () => {
+    const data = { version: 1, savedAt: new Date().toISOString(), html: container.innerHTML };
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'exam-project.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  document.querySelector('[data-action="load-json"]').addEventListener('click', () => {
+    loadJsonInput.click();
+  });
+  loadJsonInput.addEventListener('change', () => {
+    const file = loadJsonInput.files && loadJsonInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (typeof data.html === 'string') {
+          container.innerHTML = data.html;
+          activePage = container.querySelector('.page');
+          scheduleOverflowCheck();
+        }
+      } catch (err) {
+        alert('ファイルの読み込みに失敗しました。');
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  /* ------------------------------------------------------------
+     Export PNG / PDF
+  ------------------------------------------------------------ */
+  async function withZoomReset(fn) {
+    const prevZoom = zoom;
+    zoom = 1;
+    applyZoom();
+    if (document.activeElement) document.activeElement.blur();
+    await new Promise((r) => setTimeout(r, 50)); // allow reflow
+    try {
+      await fn();
+    } finally {
+      zoom = prevZoom;
+      applyZoom();
+    }
+  }
+
+  async function captureAllPages() {
+    const pages = Array.from(document.querySelectorAll('.page'));
+    const canvases = [];
+    for (const p of pages) {
+      const canvas = await html2canvas(p, {
+        scale: 3,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        windowWidth: p.scrollWidth,
+        windowHeight: p.scrollHeight,
+      });
+      canvases.push(canvas);
+    }
+    return canvases;
+  }
+
+  document.querySelector('[data-action="export-png"]').addEventListener('click', async () => {
+    await withZoomReset(async () => {
+      const canvases = await captureAllPages();
+      canvases.forEach((canvas, i) => {
+        const a = document.createElement('a');
+        a.download = 'exam-page-' + (i + 1) + '.png';
+        a.href = canvas.toDataURL('image/png');
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
+    });
+  });
+
+  document.querySelector('[data-action="export-pdf"]').addEventListener('click', async () => {
+    await withZoomReset(async () => {
+      const canvases = await captureAllPages();
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      canvases.forEach((canvas, i) => {
+        if (i > 0) pdf.addPage();
+        const img = canvas.toDataURL('image/jpeg', 0.93);
+        pdf.addImage(img, 'JPEG', 0, 0, 210, 297);
+      });
+      pdf.save('exam.pdf');
+    });
+  });
+
+  document.querySelector('[data-action="print-page"]').addEventListener('click', () => {
+    window.print();
+  });
+
+  /* ------------------------------------------------------------
+     Initial demo content
+  ------------------------------------------------------------ */
+  function init() {
+    container.appendChild(buildCoverPage());
+    const qFrame = buildQuestionPage(1);
+    container.appendChild(qFrame);
+    const page = qFrame.querySelector('.page');
+    const pageInner = page.querySelector('.page-inner');
+    const daimon = buildDaimon(1);
+    pageInner.appendChild(daimon);
+    daimon.querySelector('.qlead').textContent =
+      '（ここに大問のリード文を入力します。例：花子さんは、○○について学習した内容をまとめた。1～3の問いに答えなさい。）';
+    const box = buildBox(2);
+    daimon.querySelector('.qbody').insertBefore(box, daimon.querySelector('.qsubs'));
+    const sq = buildSubq(1);
+    sq.querySelector('.subq-prompt').innerHTML =
+      '　文章中の<span class="blank" contenteditable="true">Ⅰ</span>に当てはまる言葉を、ア～エから一つ選び、符号で書きなさい。';
+    daimon.querySelector('.qsubs').appendChild(sq);
+    sq.appendChild(buildChoices());
+    activePage = page;
+    applyZoom();
+    scheduleOverflowCheck();
+  }
+
+  init();
+})();

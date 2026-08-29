@@ -3,65 +3,86 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>社会　問題エディタ ― 検査問題ジェネレーター</title>
+<title>入試問題ジェネレーター（公立高校入試風）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;500;700;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<!-- 画像・PDF書き出し用の外部ライブラリ（バニラJSのみで自作するのが困難な部分のみCDNを利用） -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
-<div class="topbar">
-  <h1>社会　問題エディタ</h1>
-  <div class="file-actions">
-    <button class="btn" id="save-json-btn">保存(JSON)</button>
-    <button class="btn" id="load-json-btn">読み込み(JSON)</button>
-    <input type="file" id="json-file-input" accept="application/json" style="display:none;">
+<header id="app-header">
+  <h1>入試問題ジェネレーター <span class="sub">－ 公立高校学力検査風レイアウト －</span></h1>
+  <button id="toggle-help" class="btn small">使い方</button>
+</header>
+
+<div id="toolbar">
+  <div class="tb-group">
+    <span class="tb-label">ページ</span>
+    <button data-action="add-question-page" class="btn">＋問題ページ</button>
+    <button data-action="add-cover-page" class="btn">＋表紙ページ</button>
+    <button data-action="add-divider-page" class="btn">＋中扉ページ</button>
+  </div>
+  <div class="tb-group">
+    <span class="tb-label">構成要素（挿入先のページ内をクリックしてから押してください）</span>
+    <button data-action="insert-daimon" class="btn">大問枠</button>
+    <button data-action="insert-box2" class="btn">資料ボックス（2列）</button>
+    <button data-action="insert-box1" class="btn">資料ボックス（1列）</button>
+    <button data-action="insert-subq" class="btn">設問</button>
+    <button data-action="insert-blank" class="btn">空欄□</button>
+    <button data-action="insert-underline" class="btn">下線＋丸数字</button>
+    <button data-action="insert-choices" class="btn">選択肢（ア〜）</button>
+    <button data-action="insert-refbox" class="btn">資料／図表ボックス</button>
+    <button data-action="insert-image" class="btn">画像挿入</button>
+    <button data-action="insert-bold" class="btn">太字</button>
+  </div>
+  <div class="tb-group">
+    <span class="tb-label">表示</span>
+    <button data-action="zoom-out" class="btn small">－</button>
+    <span id="zoom-level">100%</span>
+    <button data-action="zoom-in" class="btn small">＋</button>
+  </div>
+  <div class="tb-group">
+    <span class="tb-label">保存／出力</span>
+    <button data-action="save-json" class="btn">プロジェクト保存</button>
+    <button data-action="load-json" class="btn">読み込み</button>
+    <input type="file" id="load-json-input" accept=".json" style="display:none">
+    <button data-action="export-png" class="btn primary">PNG書き出し</button>
+    <button data-action="export-pdf" class="btn primary">PDF書き出し</button>
+    <button data-action="print-page" class="btn">印刷</button>
   </div>
 </div>
 
-<div class="layout">
-
-  <!-- ============ 編集パネル ============ -->
-  <div class="editor-panel">
-    <h2>出力オプション</h2>
-    <div class="cover-fields">
-      <label class="option-toggle">
-        <input type="checkbox" id="toggle-answerkey">
-        末尾に解答一覧を付ける
-      </label>
-    </div>
-
-    <h2>問題一覧</h2>
-    <div class="add-row">
-      <button class="btn light" id="add-question-btn">＋ 問題を追加</button>
-      <button class="btn light" id="load-sample-btn">サンプルを読み込む</button>
-      <button class="btn light" id="clear-all-btn">全て削除</button>
-    </div>
-
-    <div id="editor-list"></div>
-  </div>
-
-  <!-- ============ プレビュー ============ -->
-  <div class="preview-panel">
-    <div class="export-bar">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn primary" id="export-png-btn">画像として書き出す (PNG)</button>
-        <button class="btn primary" id="export-pdf-btn">PDFとして書き出す</button>
-        <button class="btn light" id="print-btn">印刷してPDF保存</button>
-      </div>
-      <div class="export-note">※「印刷してPDF保存」はブラウザの印刷ダイアログでページ区切りがきれいに入ります。</div>
-    </div>
-
-    <div class="sheet-scroll">
-      <div class="sheet" id="preview-sheet">
-        <!-- JSで動的に生成 -->
-      </div>
-    </div>
-  </div>
-
+<div id="help-panel" class="hidden">
+  <h2>使い方</h2>
+  <ol>
+    <li>「＋問題ページ」でA4サイズの用紙を追加します（本物の入試問題と同じ余白・フォントサイズで再現しています）。</li>
+    <li>ページ内の好きな場所をクリックしてカーソルを置いてから、上のツールボタンを押すと、その位置に部品（大問枠・資料ボックス・設問・空欄□・選択肢など）が挿入されます。</li>
+    <li>挿入されたテキストはそのまま画面上で直接クリックして書き換えられます（すべて編集可能）。</li>
+    <li>各部品の右上にマウスを合わせると「↑ ↓ ×」ボタンが出るので、並べ替え・削除ができます。</li>
+    <li>「下線＋丸数字」は、下線を引きたい文字列を選択してから押します。①②③…の番号を聞かれます。</li>
+    <li>「空欄□」は、四角で囲みたい語句（Ⅰ、ａ など）を選択してから押すと、その語句が四角囲みになります。選択せずに押すと空の四角が挿入されます。</li>
+    <li>「画像挿入」は地図やグラフの画像ファイルを選ぶと、その場に貼り付けられます（大きさはドラッグ後に四隅のハンドルで調整できます）。</li>
+    <li>完成したら「PNG書き出し」または「PDF書き出し」で、本物そっくりの画像／PDFとして保存できます。「プロジェクト保存」で編集内容をJSONファイルに保存し、後で「読み込み」で再編集できます。</li>
+  </ol>
+  <button class="btn" data-action="close-help">閉じる</button>
 </div>
 
+<main id="workspace">
+  <div id="pages-container">
+    <!-- pages injected by script.js -->
+  </div>
+</main>
+
+<div id="export-stage" aria-hidden="true"></div>
+<input type="file" id="image-file-input" accept="image/*" style="display:none">
+
+<footer id="app-footer">
+  <p>このツールはブラウザ内で完結する静的サイトです（GitHub Pages対応）。入力内容は外部サーバーへ送信されません。</p>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
