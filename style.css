@@ -270,152 +270,157 @@
   .sheet{
     width:210mm;
     max-width:100%;
-    background:var(--paper);
-    box-shadow:0 2px 4px rgba(0,0,0,0.08), 0 20px 45px rgba(0,0,0,0.15);
-    padding:20mm 18mm 24mm;
+    background:#ffffff;
+    color:#000000;
+    box-shadow:0 1px 2px rgba(0,0,0,0.1), 0 12px 30px rgba(0,0,0,0.15);
+    /* 実際の岐阜県入試PDFを実測したマージン（左27.3mm / 右20.3mm）に合わせています */
+    padding:20mm 20.3mm 22mm 27.3mm;
   }
 
   .cover{
     text-align:center;
-    padding:4px 0 20px;
+    padding:4px 0 18pt;
   }
   .cover .kind{
     font-family:var(--gothic);
-    font-size:12px;
+    font-size:9pt;
     letter-spacing:.5em;
-    color:var(--ink-soft);
-    margin-bottom:10px;
+    color:#000;
+    margin-bottom:10pt;
   }
   .cover h1{
     font-family:var(--mincho);
     font-weight:700;
-    font-size:32px;
-    letter-spacing:.5em;
+    font-size:22pt;
+    letter-spacing:.6em;
     margin:0;
-    padding:14px 0;
-    border-top:2px solid var(--rule);
-    border-bottom:2px solid var(--rule);
+    padding:10pt 0;
+    border-top:1.4pt solid #000;
+    border-bottom:1.4pt solid #000;
   }
   .cover .sub{
-    margin-top:12px;
+    margin-top:10pt;
     font-family:var(--gothic);
-    font-size:11px;
-    color:var(--ink-soft);
-    letter-spacing:.1em;
+    font-size:8pt;
+    color:#000;
+    letter-spacing:.05em;
     white-space:pre-line;
   }
 
   .notice{
-    border:1px solid var(--rule);
-    padding:12px 16px;
-    margin:20px 0 26px;
-    font-size:12px;
+    border:0.8pt solid #000;
+    padding:10pt 12pt;
+    margin:16pt 0 20pt;
+    font-size:9pt;
     line-height:1.85;
     white-space:pre-line;
   }
   .notice .notice-title{
     font-family:var(--gothic);
     font-weight:700;
-    font-size:11px;
+    font-size:9pt;
     letter-spacing:.3em;
-    margin-bottom:6px;
+    margin-bottom:6pt;
   }
 
   .section-label{
-    font-family:var(--gothic);
+    font-family:var(--mincho);
     font-weight:700;
-    font-size:12.5px;
-    letter-spacing:.2em;
-    background:var(--shade-strong);
-    padding:5px 12px;
-    margin:22px 0 12px;
+    font-size:11pt;
+    letter-spacing:.1em;
+    background:none;
+    border-bottom:0.8pt solid #000;
+    padding:0 0 3pt;
+    margin:20pt 0 10pt;
   }
 
   .q-block{
-    margin-bottom:22px;
+    margin-bottom:16pt;
     break-inside:avoid;
     page-break-inside:avoid;
   }
   .q-head{
     display:flex;
     align-items:baseline;
-    gap:10px;
-    margin-bottom:6px;
+    gap:8pt;
+    margin-bottom:5pt;
   }
   .q-num{
+    display:inline-block;
+    border:0.8pt solid #000;
     font-family:var(--gothic);
     font-weight:700;
-    font-size:13px;
-    min-width:40px;
-  }
-  .q-tag{
-    font-family:var(--gothic);
-    font-size:9.5px;
-    color:var(--ink-soft);
-    border:1px solid var(--rule-light);
-    padding:1px 6px;
+    font-size:9.5pt;
+    padding:0.5pt 7pt;
+    line-height:1.5;
   }
   .q-passage{
-    border:1px solid var(--rule);
-    background:var(--shade);
-    padding:12px 14px;
+    border:0.8pt solid #000;
+    background:#ffffff;
+    padding:9pt 11pt;
     font-family:var(--mincho);
-    font-size:14px;
-    line-height:1.95;
-    margin-bottom:8px;
+    font-size:10.5pt;
+    line-height:1.9;
+    margin-bottom:7pt;
   }
   .blank{
     display:inline-block;
-    border:1px solid var(--ink);
-    background:var(--paper);
-    font-family:var(--gothic);
+    border:0.8pt solid #000;
+    background:#ffffff;
+    font-family:var(--mincho);
     font-weight:700;
-    font-size:11px;
-    padding:0 5px;
-    margin:0 2px;
+    font-size:10.5pt;
+    padding:0 6pt;
+    margin:0 1pt;
   }
   .choices{
     list-style:none;
     margin:0;
     padding:0;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    column-gap:18pt;
+    row-gap:3pt;
+  }
+  .choices.single-col{
+    grid-template-columns:1fr;
   }
   .choices li{
     display:flex;
-    gap:8px;
+    gap:6pt;
     font-family:var(--mincho);
-    font-size:13.5px;
+    font-size:10.5pt;
     line-height:1.7;
-    padding:2px 4px;
   }
   .choices .kigo{
-    font-family:var(--gothic);
+    font-family:var(--mincho);
     font-weight:700;
-    min-width:1.4em;
+    min-width:1.3em;
   }
 
   .answerkey{
-    margin-top:30px;
-    padding-top:16px;
-    border-top:2px solid var(--rule);
+    margin-top:22pt;
+    padding-top:12pt;
+    border-top:1.4pt solid #000;
   }
   .answerkey h3{
     font-family:var(--gothic);
-    font-size:13px;
+    font-size:10pt;
     letter-spacing:.2em;
-    margin:0 0 10px;
+    margin:0 0 8pt;
   }
   .answerkey table{
     border-collapse:collapse;
     width:100%;
-    font-size:12.5px;
+    font-size:9.5pt;
   }
   .answerkey td{
-    border:1px solid var(--rule-light);
-    padding:5px 8px;
+    border:0.8pt solid #000;
+    padding:4pt 6pt;
     text-align:center;
   }
   .answerkey td.head{
-    background:var(--shade-strong);
+    background:#ffffff;
     font-family:var(--gothic);
     font-weight:700;
   }

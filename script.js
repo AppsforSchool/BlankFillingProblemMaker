@@ -38,6 +38,12 @@ function formatPassage(str){
 }
 const KIGO = ["ア","イ","ウ","エ"];
 
+// 選択肢のいずれかが長い場合、実際の入試同様、2列ではなく1列（縦積み）で表示する
+function isLongChoiceSet(choices){
+  const LONG_THRESHOLD = 20; // 全角換算の目安文字数
+  return choices.some(c => (c || "").length > LONG_THRESHOLD);
+}
+
 /* ===================== エディタ描画 ===================== */
 const editorList = document.getElementById('editor-list');
 
@@ -164,11 +170,10 @@ function renderPreview(){
       html += `
         <div class="q-block">
           <div class="q-head">
-            <span class="q-num">問${idx+1}</span>
-            ${q.subject ? `<span class="q-tag">${escapeHtml(q.subject)}</span>` : ''}
+            <span class="q-num">${idx+1}</span>
           </div>
           <div class="q-passage">${formatPassage(q.passage)}</div>
-          <ul class="choices">
+          <ul class="choices${isLongChoiceSet(q.choices) ? ' single-col' : ''}">
             ${q.choices.map((c,i) => `<li><span class="kigo">${KIGO[i]}</span><span>${escapeHtml(c)}</span></li>`).join('')}
           </ul>
         </div>
