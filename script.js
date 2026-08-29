@@ -104,6 +104,27 @@
   }
 
   document.addEventListener('click', function (e) {
+    const pageBtn = e.target.closest('.page-controls button[data-page-act="del-page"]');
+    if (pageBtn) {
+      e.preventDefault();
+      const frame = pageBtn.closest('.page-frame');
+      if (!frame) return;
+      const totalPages = document.querySelectorAll('.page-frame').length;
+      if (totalPages <= 1) {
+        alert('最後の1ページは削除できません。');
+        return;
+      }
+      if (confirm('このページを削除しますか？（元に戻せません）')) {
+        const wasActive = activePage && frame.contains(activePage);
+        frame.remove();
+        if (wasActive) activePage = document.querySelector('.page');
+        scheduleOverflowCheck();
+      }
+      return;
+    }
+  });
+
+  document.addEventListener('click', function (e) {
     const btn = e.target.closest('.block-controls button');
     if (!btn) return;
     e.preventDefault();
@@ -148,9 +169,13 @@
   /* ------------------------------------------------------------
      Templates
   ------------------------------------------------------------ */
+  function pageControlsHtml() {
+    return '<div class="page-controls" contenteditable="false"><button data-page-act="del-page" title="このページを削除">ページ削除 ×</button></div>';
+  }
+
   function buildQuestionPage(pageNumber) {
     return el(
-      '<div class="page-frame"><div class="page page-type-question">' +
+      '<div class="page-frame">' + pageControlsHtml() + '<div class="page page-type-question">' +
         '<div class="page-inner"></div>' +
         '<div class="page-number" contenteditable="true">－' + pageNumber + '－</div>' +
         '<div class="page-code" contenteditable="true">◇◇◇（000－00）</div>' +
@@ -160,7 +185,7 @@
 
   function buildCoverPage() {
     return el(
-      '<div class="page-frame"><div class="page page-type-cover">' +
+      '<div class="page-frame">' + pageControlsHtml() + '<div class="page page-type-cover">' +
         '<div class="cover-page">' +
           '<div class="cover-year" contenteditable="true">令和　　年度</div>' +
           '<div class="cover-titles">' +
@@ -184,7 +209,7 @@
 
   function buildDividerPage() {
     return el(
-      '<div class="page-frame"><div class="page page-type-divider">' +
+      '<div class="page-frame">' + pageControlsHtml() + '<div class="page page-type-divider">' +
         '<div class="cover-page">' +
           '<div class="cover-year" contenteditable="true">令和　　年度</div>' +
           '<div class="cover-titles">' +

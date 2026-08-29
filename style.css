@@ -124,6 +124,25 @@ html,body{margin:0;padding:0;background:#5b6472;font-family:'BIZ UDGothic',sans-
   transform:scale(var(--scale));
   transform-origin:top left;
 }
+.page-controls{
+  position:absolute;
+  top:-13px; right:4px;
+  z-index:30;
+  display:none;
+}
+.page-frame:hover .page-controls{display:block;}
+.page-controls button{
+  font-family:'BIZ UDGothic',sans-serif;
+  font-size:11px;
+  line-height:1;
+  background:#b91c1c;
+  color:#fff;
+  border:1px solid #7f1d1d;
+  border-radius:4px;
+  padding:4px 8px;
+  cursor:pointer;
+}
+.page-controls button:hover{background:#dc2626;}
 
 /* ---------- The exam page itself ---------- */
 .page{
@@ -283,10 +302,12 @@ html,body{margin:0;padding:0;background:#5b6472;font-family:'BIZ UDGothic',sans-
 .choices-block .choice-item{display:block;margin:1mm 0 1mm 4mm;}
 .choice-item{
   white-space:pre-wrap;
+}
+.choice-item .kana{
+  margin-right:0.4em;
   font-family:'BIZ UDGothic',sans-serif;
   font-weight:700;
 }
-.choice-item .kana{margin-right:0.4em;}
 
 /* ---------- free image (draggable/resizable) ---------- */
 .free-image{
@@ -348,7 +369,7 @@ html,body{margin:0;padding:0;background:#5b6472;font-family:'BIZ UDGothic',sans-
 /* ---------- print ---------- */
 @media print{
   body{background:#fff;}
-  #app-header,#toolbar,#app-footer,#help-panel,.block-controls{display:none !important;}
+  #app-header,#toolbar,#app-footer,#help-panel,.block-controls,.page-controls{display:none !important;}
   #workspace{padding:0;}
   #pages-container{gap:0;}
   .page-frame{width:var(--page-w) !important;height:var(--page-h) !important;}
