@@ -15,7 +15,7 @@
 }
 
 *{box-sizing:border-box;}
-html,body{margin:0;padding:0;background:#5b6472;font-family:'Noto Sans JP',sans-serif;}
+html,body{margin:0;padding:0;background:#5b6472;font-family:'BIZ UDGothic',sans-serif;}
 
 /* ---------- App chrome ---------- */
 #app-header{
@@ -46,7 +46,7 @@ html,body{margin:0;padding:0;background:#5b6472;font-family:'Noto Sans JP',sans-
 .tb-label{font-size:11px;color:#a9b4c4;margin-right:4px;white-space:nowrap;}
 
 .btn{
-  font-family:'Noto Sans JP',sans-serif;
+  font-family:'BIZ UDGothic',sans-serif;
   font-size:12.5px;
   background:#4a5568;
   color:#fff;
@@ -133,7 +133,7 @@ html,body{margin:0;padding:0;background:#5b6472;font-family:'Noto Sans JP',sans-
   box-shadow:0 2px 14px rgba(0,0,0,.35);
   position:relative;
   overflow:hidden;
-  font-family:'Noto Serif JP', serif;
+  font-family:'BIZ UDMincho', serif;
   font-size:10.3pt;
   line-height:1.75;
   color:var(--ink);
@@ -149,13 +149,19 @@ html,body{margin:0;padding:0;background:#5b6472;font-family:'Noto Sans JP',sans-
   bottom:9mm; left:0; right:0;
   text-align:center;
   font-size:10pt;
-  font-family:'Noto Serif JP',serif;
+  font-family:'BIZ UDMincho',serif;
 }
 .page-code{
   position:absolute;
   bottom:6mm; right:8mm;
   font-size:8pt;
   color:#333;
+}
+
+/* 太字はゴシック体で表示（本文は明朝体のため） */
+.page b, .page strong{
+  font-family:'BIZ UDGothic',sans-serif;
+  font-weight:700;
 }
 
 [contenteditable="true"]{outline:none;}
@@ -173,7 +179,7 @@ html,body{margin:0;padding:0;background:#5b6472;font-family:'Noto Sans JP',sans-
 }
 .block:hover > .block-controls{display:flex;}
 .block-controls button{
-  font-family:'Noto Sans JP',sans-serif;
+  font-family:'BIZ UDGothic',sans-serif;
   font-size:10px;
   line-height:1;
   background:#1f2937;
@@ -191,7 +197,7 @@ html,body{margin:0;padding:0;background:#5b6472;font-family:'Noto Sans JP',sans-
   flex:0 0 auto;
   width:6.3mm;height:6.3mm;
   border:1px solid var(--line);
-  font-family:'Noto Sans JP',sans-serif;
+  font-family:'BIZ UDGothic',sans-serif;
   font-weight:700;
   font-size:12.5pt;
   display:flex;align-items:center;justify-content:center;
@@ -211,7 +217,7 @@ html,body{margin:0;padding:0;background:#5b6472;font-family:'Noto Sans JP',sans-
 .infobox-single{border:1px solid var(--line);margin:1.5mm 0 3mm;}
 .infobox{padding:2mm 3mm 2.5mm;}
 .infobox-title{
-  font-family:'Noto Sans JP',sans-serif;
+  font-family:'BIZ UDGothic',sans-serif;
   font-weight:700;
   font-size:10pt;
   border-bottom:1px solid var(--line);
@@ -248,7 +254,7 @@ html,body{margin:0;padding:0;background:#5b6472;font-family:'Noto Sans JP',sans-
 }
 .ref-box.ref-narrow{width:55mm;}
 .ref-title{
-  font-family:'Noto Sans JP',sans-serif;
+  font-family:'BIZ UDGothic',sans-serif;
   font-weight:700;
   font-size:9.3pt;
   text-align:center;
@@ -275,7 +281,11 @@ html,body{margin:0;padding:0;background:#5b6472;font-family:'Noto Sans JP',sans-
 .choices{margin:1.6mm 0;}
 .choices-inline .choice-item{display:inline-block;margin-right:1.8em;}
 .choices-block .choice-item{display:block;margin:1mm 0 1mm 4mm;}
-.choice-item{white-space:pre-wrap;}
+.choice-item{
+  white-space:pre-wrap;
+  font-family:'BIZ UDGothic',sans-serif;
+  font-weight:700;
+}
 .choice-item .kana{margin-right:0.4em;}
 
 /* ---------- free image (draggable/resizable) ---------- */
@@ -294,7 +304,7 @@ html,body{margin:0;padding:0;background:#5b6472;font-family:'Noto Sans JP',sans-
 .cover-page{
   height:100%;
   position:relative;
-  font-family:'Noto Serif JP',serif;
+  font-family:'BIZ UDMincho',serif;
 }
 .cover-year{
   position:absolute;
