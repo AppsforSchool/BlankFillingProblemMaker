@@ -635,6 +635,7 @@
     zoom = 1;
     applyZoom();
     if (document.activeElement) document.activeElement.blur();
+
     if (document.fonts && document.fonts.ready) {
       try {
         await Promise.all([
@@ -647,7 +648,31 @@
         /* ignore font preload errors and continue */
       }
     }
-    await new Promise((r) => setTimeout(r, 80)); // allow reflow after font swap
+    await new Promise((r) => setTimeout(r, 200));
+
+    // html2canvas sometimes rasterises a custom web font incorrectly on its
+    // very first call in a page session (falling back to a default serif/
+    // sans font) even though the font is already loaded and displays
+    // correctly on screen. Doing one throwaway capture "warms up" its
+    // internal font handling so the real capture below picks up the
+    // correct BIZ UDMincho / BIZ UDGothic glyphs.
+    try {
+      const warm = document.createElement('div');
+      warm.style.position = 'fixed';
+      warm.style.left = '-9999px';
+      warm.style.top = '0';
+      warm.style.padding = '4px';
+      warm.innerHTML =
+        '<span style="font-family:\'BIZ UDMincho\',serif;font-size:14pt;">明朝Ⅰ</span>' +
+        '<span style="font-family:\'BIZ UDGothic\',sans-serif;font-weight:700;font-size:14pt;">ゴシックア</span>';
+      document.body.appendChild(warm);
+      await html2canvas(warm, { scale: 1, backgroundColor: '#ffffff' });
+      warm.remove();
+      await new Promise((r) => setTimeout(r, 50));
+    } catch (err) {
+      /* warm-up is best-effort only */
+    }
+
     try {
       await fn();
     } finally {
