@@ -3,86 +3,104 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>入試問題ジェネレーター（公立高校入試風）</title>
+<title>入試問題ジェネレーター（社会・岐阜県公立高校スタイル）</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=BIZ+UDMincho&family=BIZ+UDGothic:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header id="app-header">
-  <h1>入試問題ジェネレーター <span class="sub">－ 公立高校学力検査風レイアウト －</span></h1>
-  <button id="toggle-help" class="btn small">使い方</button>
+<header class="app-header no-print">
+  <div class="app-header__title">📝 入試問題ジェネレーター <span>― 社会科・公立高校入試スタイル</span></div>
+  <div class="app-header__actions">
+    <button id="btn-help" class="btn btn--ghost">使い方</button>
+    <button id="btn-save" class="btn btn--ghost">💾 保存</button>
+    <button id="btn-load" class="btn btn--ghost">📂 読み込み</button>
+    <input type="file" id="file-load" accept="application/json" hidden>
+    <button id="btn-print" class="btn btn--ghost">🖨 印刷</button>
+    <button id="btn-export-img" class="btn">🖼 画像で書き出す</button>
+    <button id="btn-export-pdf" class="btn btn--primary">📄 PDFで書き出す</button>
+  </div>
 </header>
 
-<div id="toolbar">
-  <div class="tb-group">
-    <span class="tb-label">ページ</span>
-    <button data-action="add-question-page" class="btn">＋問題ページ</button>
-    <button data-action="add-cover-page" class="btn">＋表紙ページ</button>
-    <button data-action="add-divider-page" class="btn">＋中扉ページ</button>
-  </div>
-  <div class="tb-group">
-    <span class="tb-label">構成要素（挿入先のページ内をクリックしてから押してください）</span>
-    <button data-action="insert-daimon" class="btn">大問枠</button>
-    <button data-action="insert-box2" class="btn">資料ボックス（2列）</button>
-    <button data-action="insert-box1" class="btn">資料ボックス（1列）</button>
-    <button data-action="insert-subq" class="btn">設問</button>
-    <button data-action="insert-blank" class="btn">空欄□</button>
-    <button data-action="insert-underline" class="btn">下線＋丸数字</button>
-    <button data-action="insert-choices" class="btn">選択肢（ア〜）</button>
-    <button data-action="insert-refbox" class="btn">資料／図表ボックス</button>
-    <button data-action="insert-image" class="btn">画像挿入</button>
-    <button data-action="insert-bold" class="btn">太字</button>
-  </div>
-  <div class="tb-group">
-    <span class="tb-label">表示</span>
-    <button data-action="zoom-out" class="btn small">－</button>
-    <span id="zoom-level">100%</span>
-    <button data-action="zoom-in" class="btn small">＋</button>
-  </div>
-  <div class="tb-group">
-    <span class="tb-label">保存／出力</span>
-    <button data-action="save-json" class="btn">プロジェクト保存</button>
-    <button data-action="load-json" class="btn">読み込み</button>
-    <input type="file" id="load-json-input" accept=".json" style="display:none">
-    <button data-action="export-png" class="btn primary">PNG書き出し</button>
-    <button data-action="export-pdf" class="btn primary">PDF書き出し</button>
-    <button data-action="print-page" class="btn">印刷</button>
-  </div>
+<div class="app-body">
+
+  <aside class="side-panel no-print">
+    <div class="side-panel__section">
+      <h3>ページを追加</h3>
+      <button class="tool-btn" data-add="cover">表紙ページ</button>
+      <button class="tool-btn" data-add="question">問題ページ</button>
+    </div>
+
+    <div class="side-panel__section" id="block-tools" hidden>
+      <h3>ブロックを挿入</h3>
+      <p class="hint">追加したいページ内をクリックしてから使ってください。</p>
+      <button class="tool-btn" data-block="major">🔲 大問見出し（１・２…）</button>
+      <button class="tool-btn" data-block="leadbox">📦 リード文（枠付き）</button>
+      <button class="tool-btn" data-block="subq">① 小問（１・２…）</button>
+      <button class="tool-btn" data-block="choices">🅰 選択肢（ア～エ）</button>
+      <button class="tool-btn" data-block="table">▦ 表</button>
+      <button class="tool-btn" data-block="resource">🖼 資料枠（画像なし）</button>
+      <button class="tool-btn" data-block="text">✎ 自由記述テキスト</button>
+      <hr>
+      <p class="hint">文中カーソル位置に挿入：</p>
+      <button class="tool-btn tool-btn--inline" data-inline="blank-line">＿＿＿（罫線）</button>
+      <button class="tool-btn tool-btn--inline" data-inline="fill-box">▭（記入枠）</button>
+      <button class="tool-btn tool-btn--inline" data-inline="circled">①（丸数字）</button>
+    </div>
+
+    <div class="side-panel__section">
+      <h3>表紙の設定</h3>
+      <label class="field">年度
+        <input type="text" id="setting-era" value="令和　　年度">
+      </label>
+      <label class="field">教科名
+        <input type="text" id="setting-subject" value="社　会">
+      </label>
+    </div>
+
+    <div class="side-panel__section">
+      <h3>フッター設定</h3>
+      <label class="field checkbox">
+        <input type="checkbox" id="setting-pagenum" checked> ページ番号を表示
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" id="setting-code" checked> 隅の管理コードを表示
+      </label>
+      <label class="field">コード接頭辞
+        <input type="text" id="setting-codeprefix" value="◇M５（830－">
+      </label>
+    </div>
+
+    <div class="side-panel__section">
+      <p class="hint small">選択中のブロックにマウスを乗せると、右上に移動・削除ボタンが表示されます。画像・グラフ資料そのものの追加には対応していません（枠のみ配置できます）。</p>
+    </div>
+  </aside>
+
+  <main class="preview-wrap">
+    <div id="pages-root"><!-- exam pages injected here --></div>
+  </main>
+
 </div>
 
-<div id="help-panel" class="hidden">
-  <h2>使い方</h2>
-  <ol>
-    <li>「＋問題ページ」でA4サイズの用紙を追加します（本物の入試問題と同じ余白・フォントサイズで再現しています）。</li>
-    <li>ページ内の好きな場所をクリックしてカーソルを置いてから、上のツールボタンを押すと、その位置に部品（大問枠・資料ボックス・設問・空欄□・選択肢など）が挿入されます。</li>
-    <li>挿入されたテキストはそのまま画面上で直接クリックして書き換えられます（すべて編集可能）。</li>
-    <li>各部品の右上にマウスを合わせると「↑ ↓ ×」ボタンが出るので、並べ替え・削除ができます。</li>
-    <li>「下線＋丸数字」は、下線を引きたい文字列を選択してから押します。①②③…の番号を聞かれます。</li>
-    <li>「空欄□」は、四角で囲みたい語句（Ⅰ、ａ など）を選択してから押すと、その語句が四角囲みになります。選択せずに押すと空の四角が挿入されます。</li>
-    <li>「画像挿入」は地図やグラフの画像ファイルを選ぶと、その場に貼り付けられます（大きさはドラッグ後に四隅のハンドルで調整できます）。</li>
-    <li>完成したら「PNG書き出し」または「PDF書き出し」で、本物そっくりの画像／PDFとして保存できます。「プロジェクト保存」で編集内容をJSONファイルに保存し、後で「読み込み」で再編集できます。</li>
-  </ol>
-  <button class="btn" data-action="close-help">閉じる</button>
-</div>
-
-<main id="workspace">
-  <div id="pages-container">
-    <!-- pages injected by script.js -->
+<div id="help-modal" class="modal no-print" hidden>
+  <div class="modal__box">
+    <h2>使い方</h2>
+    <ol>
+      <li>左のパネルで「表紙ページ」または「問題ページ」を追加します。</li>
+      <li>問題ページをクリックして選択すると、左に「ブロックを挿入」メニューが出ます。大問見出し・リード文・小問・選択肢・表・資料枠などを追加してください。</li>
+      <li>本文中の好きな位置にカーソルを置いてから「罫線」「記入枠」「丸数字」ボタンを押すと、その位置に挿入されます。</li>
+      <li>文字はすべてクリックしてそのまま書き換えられます（枠内も直接編集できます）。</li>
+      <li>ブロックにマウスを乗せると右上に ↑ ↓ ✕ ボタンが出るので、並べ替え・削除ができます。</li>
+      <li>完成したら「画像で書き出す」「PDFで書き出す」「印刷」のいずれかで出力してください。「保存」でJSON形式の下書きを保存し、後で「読み込み」で再編集できます。</li>
+    </ol>
+    <button id="help-close" class="btn btn--primary">閉じる</button>
   </div>
-</main>
-
-<div id="export-stage" aria-hidden="true"></div>
-<input type="file" id="image-file-input" accept="image/*" style="display:none">
-
-<footer id="app-footer">
-  <p>このツールはブラウザ内で完結する静的サイトです（GitHub Pages対応）。入力内容は外部サーバーへ送信されません。</p>
-</footer>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="script.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
