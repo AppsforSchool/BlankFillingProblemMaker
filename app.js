@@ -390,10 +390,27 @@
      ============================================================ */
 
   document.getElementById('btn-help').addEventListener('click', ()=>{
-    document.getElementById('help-modal').hidden = false;
+    const modal = document.getElementById('help-modal');
+    modal.hidden = false;
+    modal.style.display = 'flex';
   });
-  document.getElementById('help-close').addEventListener('click', ()=>{
-    document.getElementById('help-modal').hidden = true;
+
+  function closeHelpModal(){
+    const modal = document.getElementById('help-modal');
+    modal.style.display = 'none';
+    modal.hidden = true;
+  }
+  document.getElementById('help-close').addEventListener('click', closeHelpModal);
+
+  // also close when clicking the dark backdrop (outside the box), or pressing Escape
+  document.getElementById('help-modal').addEventListener('click', (e)=>{
+    if(e.target.id === 'help-modal') closeHelpModal();
+  });
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape'){
+      const modal = document.getElementById('help-modal');
+      if(!modal.hidden) closeHelpModal();
+    }
   });
 
   /* ============================================================
